@@ -8,11 +8,15 @@
 ![React](https://img.shields.io/badge/frontend-React-61DAFB)
 ![Mapbox](https://img.shields.io/badge/maps-Mapbox-black)
 
+🌐 **Live Site:** [https://foodlymap.com](https://foodlymap.com)
+
 ---
 
 ## Overview
 
 **Foodly Map** is a social food discovery app focused on *trusted recommendations* rather than global review overload.
+
+👉 **[Visit the live site →](https://foodlymap.com)**
 
 Instead of browsing thousands of anonymous reviews, users:
 - Build a **personal food map**
