@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #050807;
+  color: #e9fff2;
+  font-family: "Inter", "SF Pro Text", system-ui, -apple-system, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Mapbox popup styling for demo */
+.demo-popup .mapboxgl-popup-content {
+  background: #0b1210;
+  border: 1px solid rgba(57, 255, 136, 0.3);
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 0 12px rgba(57, 255, 136, 0.2);
+}
+
+.demo-popup .mapboxgl-popup-tip {
+  border-top-color: #0b1210;
+}
+
+.demo-popup .mapboxgl-popup-close-button {
+  color: #e9fff2;
+  font-size: 20px;
+  padding: 4px 8px;
+}
+
+.demo-popup .mapboxgl-popup-close-button:hover {
+  color: #39ff88;
+}
+
+/* Drop shadow for hero title glow effect */
+.drop-shadow-glow {
+  filter: drop-shadow(0 0 8px rgba(57, 255, 136, 0.4));
+}

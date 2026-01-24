@@ -1,0 +1,23 @@
+[
+  {
+    "id": "1",
+    "name": "The Breakfast Klub",
+    "latitude": 29.7524,
+    "longitude": -95.3704,
+    "category": "Breakfast"
+  },
+  {
+    "id": "2",
+    "name": "Ninfa's on Navigation",
+    "latitude": 29.7604,
+    "longitude": -95.3698,
+    "category": "Mexican"
+  },
+  {
+    "id": "3",
+    "name": "Killen's Barbecue",
+    "latitude": 29.7484,
+    "longitude": -95.3804,
+    "category": "BBQ"
+  }
+]
