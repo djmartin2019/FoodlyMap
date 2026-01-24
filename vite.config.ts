@@ -3,4 +3,25 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    // Optimize build output for production
+    minify: "esbuild",
+    sourcemap: false, // Disable sourcemaps in production for smaller bundle
+    rollupOptions: {
+      output: {
+        // Optimize chunk splitting for better caching
+        manualChunks: {
+          vendor: ["react", "react-dom"],
+          router: ["@tanstack/react-router"],
+          mapbox: ["mapbox-gl"],
+        },
+      },
+    },
+    // Increase chunk size warning limit (mapbox-gl is large)
+    chunkSizeWarningLimit: 1000,
+  },
+  // Optimize dependencies
+  optimizeDeps: {
+    include: ["react", "react-dom", "@tanstack/react-router"],
+  },
 });

@@ -17,6 +17,7 @@ export default function ContactPage() {
             href="https://djm-tech.dev/contact/"
             target="_blank"
             rel="noopener noreferrer"
+            aria-label="Contact DJM-Tech (opens in new tab)"
             className="inline-block rounded-lg border-2 border-accent/60 bg-surface/80 px-8 py-3 text-base font-semibold text-accent shadow-glow transition-all duration-300 hover:-translate-y-0.5 hover:border-accent hover:bg-accent/10 hover:shadow-glow-lg"
           >
             Get in Touch

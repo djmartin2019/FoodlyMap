@@ -56,6 +56,9 @@ export default function DashboardPage() {
         // Create custom marker element with neon green styling
         const el = document.createElement("div");
         el.className = "demo-marker";
+        el.setAttribute("role", "button");
+        el.setAttribute("aria-label", `Location: ${location.name}`);
+        el.setAttribute("tabindex", "0");
         el.style.width = "12px";
         el.style.height = "12px";
         el.style.borderRadius = "50%";
@@ -76,10 +79,12 @@ export default function DashboardPage() {
         // Get the actual marker element (more reliable than using el directly)
         const markerElement = marker.getElement();
 
-        // Add click handler: show popup and fly to location
-        // Using marker.getElement() ensures we're attaching to the correct element
-        markerElement.addEventListener("click", (e) => {
-          console.log("Marker clicked:", location.name);
+        // Handle marker interaction (click and keyboard)
+        const handleInteraction = (e: MouseEvent | KeyboardEvent) => {
+          if (e instanceof KeyboardEvent && e.key !== "Enter" && e.key !== " ") {
+            return;
+          }
+          e.preventDefault();
           e.stopPropagation(); // Prevent map click events
 
           if (!mapRef.current || !popupRef.current) return;
@@ -100,7 +105,12 @@ export default function DashboardPage() {
             duration: 1000,
             essential: true,
           });
-        });
+        };
+
+        // Add click handler: show popup and fly to location
+        markerElement.addEventListener("click", handleInteraction);
+        // Add keyboard handler for accessibility
+        markerElement.addEventListener("keydown", handleInteraction);
 
         markersRef.current.push(marker);
       });
@@ -141,6 +151,7 @@ export default function DashboardPage() {
           onClick={() => {
             document.getElementById("map-demo")?.scrollIntoView({ behavior: "smooth", block: "start" });
           }}
+          aria-label="Scroll to interactive map demo"
           className="group relative animate-fade-in-delay-2 rounded-lg border-2 border-accent/60 bg-surface/80 px-8 py-3 text-base font-semibold text-accent shadow-glow transition-all duration-300 hover:-translate-y-0.5 hover:border-accent hover:bg-accent/10 hover:shadow-glow-lg"
         >
           <span className="relative z-10">Explore the Map</span>
@@ -162,9 +173,14 @@ export default function DashboardPage() {
             and discover new spots through friends.
           </p>
           <div className="relative h-64 w-full overflow-hidden rounded-lg border-2 border-accent/20 bg-bg/40 shadow-inner transition-all duration-300 group-hover:border-accent/40 group-hover:shadow-neon-md md:h-80">
-            <div ref={mapContainerRef} className="h-full w-full" />
+            <div 
+              ref={mapContainerRef} 
+              className="h-full w-full" 
+              role="application"
+              aria-label="Interactive food map showing demo locations"
+            />
             {!import.meta.env.VITE_MAPBOX_TOKEN && (
-              <div className="absolute inset-0 flex items-center justify-center bg-bg/80">
+              <div className="absolute inset-0 flex items-center justify-center bg-bg/80" role="status" aria-live="polite">
                 <p className="text-sm text-text/60">
                   Add VITE_MAPBOX_TOKEN to your .env file to see the map
                 </p>

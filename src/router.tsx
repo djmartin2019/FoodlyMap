@@ -27,11 +27,12 @@ function RootLayout() {
 
   return (
     <div className="min-h-screen bg-bg text-text flex flex-col">
-      <nav className="sticky top-0 z-10 border-b border-surface bg-bg/90 backdrop-blur">
+      <nav className="sticky top-0 z-10 border-b border-surface bg-bg/90 backdrop-blur" aria-label="Main navigation">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4">
           <Link
             to="/"
             className="text-lg font-semibold tracking-wide text-text transition-colors hover:text-accent"
+            aria-label="Foodly Map home"
           >
             Foodly Map
           </Link>
@@ -50,6 +51,7 @@ function RootLayout() {
               href="https://djm-tech.dev"
               target="_blank"
               rel="noopener noreferrer"
+              aria-label="DJM-Tech website (opens in new tab)"
               className="text-accent/70 transition-colors hover:text-accent"
             >
               DJM-Tech
@@ -59,6 +61,7 @@ function RootLayout() {
           <Link
             to="/contact"
             className="text-accent/70 transition-colors hover:text-accent"
+            aria-label="Contact page"
           >
             Contact
           </Link>
