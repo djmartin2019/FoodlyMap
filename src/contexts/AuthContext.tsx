@@ -64,26 +64,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     // Global auth state listener
-    // This handles invite links, magic links, and normal logins
-    // We listen for SIGNED_IN events to redirect users to the correct page
+    // This is required for invite links and magic links to work correctly.
+    // When a user clicks an invite link (e.g., https://foodlymap.com/#access_token=...),
+    // Supabase processes the hash and fires a SIGNED_IN event. We listen for this
+    // event to check onboarding status and trigger redirects via AuthRedirectHandler.
+    // We focus on SIGNED_IN events specifically to handle post-authentication routing.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session) => {
       setSession(session);
       setUser(session?.user ?? null);
 
-      // Handle SIGNED_IN event (invite links, magic links, login)
+      // Handle SIGNED_IN event (invite links, magic links, normal login)
+      // This is the key event that fires when Supabase processes URL hash tokens
       if (event === "SIGNED_IN" && session?.user) {
-        // Check onboarding status
+        // Check onboarding status from profiles table
         const isComplete = await checkOnboardingStatus(session.user.id);
         setOnboardingComplete(isComplete);
-
-        // Navigation will be handled by route guards based on onboarding status
-        // This prevents redirect loops and ensures correct routing
+        // Navigation is handled by AuthRedirectHandler component based on onboarding status
       } else if (event === "SIGNED_OUT") {
         setOnboardingComplete(null);
       } else if (session?.user) {
-        // For other events (like TOKEN_REFRESHED), check status
+        // For other events (like TOKEN_REFRESHED), update status but don't redirect
         const isComplete = await checkOnboardingStatus(session.user.id);
         setOnboardingComplete(isComplete);
       } else {

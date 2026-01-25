@@ -26,6 +26,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     // Sessions will survive page refreshes
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: false, // Disable URL-based session detection for security
+    // Enable URL hash detection for invite links and magic links
+    // This allows Supabase to automatically process #access_token=... from invite/magic links
+    detectSessionInUrl: true,
   },
 });
