@@ -180,6 +180,7 @@ export default function SetPasswordPage() {
       // Step 2: Insert or update profile with onboarding_complete = true
       const profileData = {
         id: currentUser.id,
+        email: currentUser.email, // Required field
         username: username.toLowerCase().trim(),
         first_name: firstName.trim(),
         last_name: lastName.trim() || null,
@@ -268,6 +269,7 @@ export default function SetPasswordPage() {
             const { error: updateError } = await supabase
               .from("profiles")
               .update({
+                email: profileData.email,
                 username: profileData.username,
                 first_name: profileData.first_name,
                 last_name: profileData.last_name,
