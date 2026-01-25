@@ -171,24 +171,34 @@ export default function SetPasswordPage() {
       // Skip session refresh for invite links - session is already valid
       console.log("Skipping session refresh (session should already be valid for invite links)");
 
-      // Step 1: Update password FIRST (before profile creation)
-      // Do this synchronously to ensure it completes before we create the profile
-      console.log("Updating password...");
-      try {
-        const { error: passwordError } = await supabase.auth.updateUser({
-          password: password,
-        });
+      // Step 1: Update password with timeout (non-blocking)
+      // For invite links, password update can hang, so we use a timeout
+      console.log("Updating password (with 3 second timeout)...");
+      
+      const passwordUpdatePromise = supabase.auth.updateUser({
+        password: password,
+      }).then(({ error }) => {
+        if (error) throw error;
+        return { success: true };
+      });
 
-        if (passwordError) {
-          console.error("Password update error:", passwordError);
-          // Don't block - continue with profile creation
-          // User can set password later via password reset if needed
-          console.warn("Continuing with profile creation despite password update error");
+      // Race the password update against a timeout
+      const timeoutPromise = new Promise((resolve) => {
+        setTimeout(() => resolve({ timeout: true }), 3000); // 3 second timeout
+      });
+
+      try {
+        const result = await Promise.race([passwordUpdatePromise, timeoutPromise]);
+        if ((result as any).timeout) {
+          console.warn("Password update timed out after 3 seconds - continuing with profile creation");
+          console.warn("Password update may complete in background, or user can set it later via password reset");
         } else {
           console.log("Password updated successfully");
         }
-      } catch (passwordErr) {
-        console.error("Password update exception:", passwordErr);
+      } catch (passwordErr: any) {
+        // Error (not timeout) - log but don't block
+        console.error("Password update error:", passwordErr);
+        console.warn("Continuing with profile creation despite password update error");
         // Continue anyway - profile creation is more important
       }
 
