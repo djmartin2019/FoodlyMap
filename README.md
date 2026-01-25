@@ -153,10 +153,3 @@ Dark mode is the default. Light mode may be added later.
 ### Prerequisites
 - Node.js 18+
 - Mapbox account (free tier)
-
-### Environment Variables
-
-Create a `.env` file:
-
-```env
-VITE_MAPBOX_TOKEN=your_mapbox_access_token

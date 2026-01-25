@@ -1,11 +1,25 @@
-import { Link, Outlet, createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
+import {
+  Link,
+  Outlet,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  redirect,
+  useNavigate,
+} from "@tanstack/react-router";
 import DashboardPage from "./pages/DashboardPage";
 import ContactPage from "./pages/ContactPage";
+import LoginPage from "./pages/LoginPage";
+import AppPage from "./pages/AppPage";
+import RequestAccessPage from "./pages/RequestAccessPage";
+import { useAuth } from "./contexts/AuthContext";
 
+// Root route with layout
 const rootRoute = createRootRoute({
   component: RootLayout,
 });
 
+// Public routes (accessible without authentication)
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
@@ -18,12 +32,75 @@ const contactRoute = createRoute({
   component: ContactPage,
 });
 
-const routeTree = rootRoute.addChildren([dashboardRoute, contactRoute]);
+// Request access route (public, no authentication required)
+const requestAccessRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/request-access",
+  component: RequestAccessPage,
+});
+
+// Login route (public, but redirects to /app if already authenticated)
+const loginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/login",
+  component: LoginPage,
+  beforeLoad: async () => {
+    // Check if user is already authenticated
+    // If so, redirect to protected app route
+    const { supabase } = await import("./lib/supabase");
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (session) {
+      throw redirect({
+        to: "/app",
+      });
+    }
+  },
+});
+
+// Protected route (requires authentication)
+const appRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/app",
+  component: AppPage,
+  beforeLoad: async () => {
+    // Check authentication before allowing access
+    const { supabase } = await import("./lib/supabase");
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    // If no session, redirect to login
+    if (!session) {
+      throw redirect({
+        to: "/login",
+      });
+    }
+  },
+});
+
+const routeTree = rootRoute.addChildren([
+  dashboardRoute,
+  contactRoute,
+  loginRoute,
+  requestAccessRoute,
+  appRoute,
+]);
 
 export const router = createRouter({ routeTree });
 
 function RootLayout() {
   const currentYear = new Date().getFullYear();
+  // Use auth context to show/hide navigation items
+  const { user, signOut, loading } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate({ to: "/login" });
+  };
 
   return (
     <div className="min-h-screen bg-bg text-text flex flex-col">
@@ -36,6 +113,31 @@ function RootLayout() {
           >
             Foodly Map
           </Link>
+          <div className="flex items-center gap-4">
+            {user ? (
+              <>
+                <Link
+                  to="/app"
+                  className="text-sm text-text/70 transition-colors hover:text-accent"
+                >
+                  App
+                </Link>
+                <button
+                  onClick={handleSignOut}
+                  className="text-sm text-text/70 transition-colors hover:text-accent"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <Link
+                to="/login"
+                className="text-sm text-text/70 transition-colors hover:text-accent"
+              >
+                Sign In
+              </Link>
+            )}
+          </div>
         </div>
       </nav>
       <main className="flex-1">
