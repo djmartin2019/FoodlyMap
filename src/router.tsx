@@ -12,6 +12,7 @@ import ContactPage from "./pages/ContactPage";
 import LoginPage from "./pages/LoginPage";
 import AppPage from "./pages/AppPage";
 import RequestAccessPage from "./pages/RequestAccessPage";
+import SetPasswordPage from "./pages/SetPasswordPage";
 import { useAuth } from "./contexts/AuthContext";
 
 // Root route with layout
@@ -60,6 +61,27 @@ const loginRoute = createRoute({
   },
 });
 
+// Set password route (requires authentication, for onboarding)
+const setPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/set-password",
+  component: SetPasswordPage,
+  beforeLoad: async () => {
+    // Check authentication before allowing access
+    const { supabase } = await import("./lib/supabase");
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    // If no session, redirect to login
+    if (!session) {
+      throw redirect({
+        to: "/login",
+      });
+    }
+  },
+});
+
 // Protected route (requires authentication)
 const appRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -86,6 +108,7 @@ const routeTree = rootRoute.addChildren([
   contactRoute,
   loginRoute,
   requestAccessRoute,
+  setPasswordRoute,
   appRoute,
 ]);
 
