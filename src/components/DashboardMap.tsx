@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
-import { useAuth } from "../contexts/AuthContext";
 
 export type MapMode = "VIEW" | "ADD_PLACE";
 

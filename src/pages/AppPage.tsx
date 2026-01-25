@@ -177,7 +177,7 @@ export default function AppPage() {
         </p>
         {/* Map container - full width, fixed height for stability */}
         <div className="relative h-[600px] w-full overflow-hidden rounded-lg border-2 border-accent/20 bg-bg/40 shadow-inner">
-          <DashboardMap />
+          <DashboardMap mode="VIEW" />
         </div>
       </div>
     </div>

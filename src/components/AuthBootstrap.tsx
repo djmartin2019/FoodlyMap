@@ -1,4 +1,3 @@
-import { ReactNode } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { RouterProvider } from "@tanstack/react-router";
 import { router } from "../router";
@@ -24,7 +23,7 @@ import { router } from "../router";
  * - Mapbox only mounts when auth is resolved
  * - Navigation works correctly after refresh
  */
-export function AuthBootstrap({ children }: { children?: ReactNode }) {
+export function AuthBootstrap() {
   const { loading: authLoading } = useAuth();
 
   // CRITICAL: Do NOT render router until auth is fully resolved
