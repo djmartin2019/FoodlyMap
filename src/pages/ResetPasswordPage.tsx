@@ -1,10 +1,8 @@
 import { useState, FormEvent, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "../lib/supabase";
-import { useAuth } from "../contexts/AuthContext";
 
 export default function ResetPasswordPage() {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");

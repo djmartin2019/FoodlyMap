@@ -237,7 +237,6 @@ function RootLayout() {
   const currentYear = new Date().getFullYear();
   // Use auth context to show/hide navigation items
   const { user, signOut } = useAuth();
-  const navigate = useNavigate();
 
   const handleSignOut = async () => {
     try {
