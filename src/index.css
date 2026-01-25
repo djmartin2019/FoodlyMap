@@ -18,6 +18,10 @@ body {
 }
 
 #root {
+  /* Use dynamic viewport height for iOS Safari compatibility */
+  /* 100dvh respects the dynamic viewport that changes when Safari UI chrome appears/disappears */
+  min-height: 100dvh;
+  /* Fallback for browsers that don't support dvh */
   min-height: 100vh;
 }
 

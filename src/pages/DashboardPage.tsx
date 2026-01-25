@@ -401,12 +401,47 @@ export default function DashboardPage() {
 
       {/* Differentiation Section */}
       <section className="mb-12">
-        <div className="rounded-2xl border border-surface/60 bg-surface/30 p-8 shadow-neon-sm transition-all duration-300 hover:shadow-neon-md md:p-12">
-          <h2 className="mb-6 text-3xl font-semibold text-text">What Makes Us Different</h2>
-          <p className="mb-10 text-lg text-text/80">
+        <div className="rounded-2xl border border-surface/60 bg-surface/30 p-4 shadow-neon-sm transition-all duration-300 hover:shadow-neon-md sm:p-6 md:p-12">
+          <h2 className="mb-4 text-2xl font-semibold text-text sm:mb-6 sm:text-3xl">What Makes Us Different</h2>
+          <p className="mb-6 text-base text-text/80 sm:mb-10 sm:text-lg">
             Foodly Map vs. traditional food discovery apps:
           </p>
-          <div className="overflow-x-auto">
+          
+          {/* Mobile: Stacked card layout - no horizontal scrolling */}
+          <div className="space-y-4 sm:hidden">
+            <div className="rounded-xl border border-surface/60 bg-bg/40 p-5 shadow-neon-sm">
+              <div className="mb-2 text-xs font-medium uppercase tracking-wide text-text/50">Focus</div>
+              <div className="text-lg font-semibold text-accent">Personal-first</div>
+              <div className="mt-2 text-sm text-text/60">vs. Global-first</div>
+            </div>
+            
+            <div className="rounded-xl border border-surface/60 bg-bg/40 p-5 shadow-neon-sm">
+              <div className="mb-2 text-xs font-medium uppercase tracking-wide text-text/50">Recommendations</div>
+              <div className="text-lg font-semibold text-accent">Friends over strangers</div>
+              <div className="mt-2 text-sm text-text/60">vs. Strangers over friends</div>
+            </div>
+            
+            <div className="rounded-xl border border-surface/60 bg-bg/40 p-5 shadow-neon-sm">
+              <div className="mb-2 text-xs font-medium uppercase tracking-wide text-text/50">Content Model</div>
+              <div className="text-lg font-semibold text-accent">Collection over reviews</div>
+              <div className="mt-2 text-sm text-text/60">vs. Reviews over collection</div>
+            </div>
+            
+            <div className="rounded-xl border border-surface/60 bg-bg/40 p-5 shadow-neon-sm">
+              <div className="mb-2 text-xs font-medium uppercase tracking-wide text-text/50">Discovery</div>
+              <div className="text-lg font-semibold text-accent">Signal over noise</div>
+              <div className="mt-2 text-sm text-text/60">vs. Algorithm-driven noise</div>
+            </div>
+            
+            <div className="rounded-xl border border-surface/60 bg-bg/40 p-5 shadow-neon-sm">
+              <div className="mb-2 text-xs font-medium uppercase tracking-wide text-text/50">Trust Model</div>
+              <div className="text-lg font-semibold text-accent">Social verification</div>
+              <div className="mt-2 text-sm text-text/60">vs. Star ratings</div>
+            </div>
+          </div>
+
+          {/* Desktop: Table layout for larger screens */}
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-surface">

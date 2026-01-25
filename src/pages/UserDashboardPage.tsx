@@ -170,48 +170,50 @@ export default function UserDashboardPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col px-6 py-12 md:px-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="mb-2 text-4xl font-bold tracking-tight text-accent md:text-5xl">
+    <div className="mx-auto flex w-full max-w-6xl flex-col px-4 py-6 sm:px-6 sm:py-8 md:px-8 md:py-12">
+      {/* Header - Mobile: Increased spacing for better vertical rhythm on iOS Safari */}
+      <div className="mb-6 sm:mb-8">
+        <h1 className="mb-3 text-3xl font-bold tracking-tight text-accent sm:mb-2 sm:text-4xl md:text-5xl">
           Your Food Map
         </h1>
-        <p className="text-text/70">
+        <p className="text-base text-text/70 sm:text-sm">
           Explore and manage your personal food collection on the map.
         </p>
       </div>
 
-      {/* Map Section - Full width and height */}
-      <div className="rounded-2xl border border-surface/60 bg-surface/30 p-8 shadow-neon-sm">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold text-accent">Map View</h2>
-            <p className="mt-1 text-text/80">
+      {/* Map Section - Mobile: Reduced padding, better spacing for iOS Safari */}
+      <div className="rounded-2xl border border-surface/60 bg-surface/30 p-4 shadow-neon-sm sm:p-6 md:p-8">
+        {/* Mobile: Stack header and buttons vertically on small screens for better touch targets */}
+        <div className="mb-4 flex flex-col gap-3 sm:mb-4 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
+          <div className="flex-1">
+            <h2 className="text-xl font-semibold text-accent sm:text-2xl">Map View</h2>
+            <p className="mt-2 text-sm text-text/80 sm:mt-1 sm:text-base">
               {mode === "ADD_PLACE" 
-                ? "Pan the map to position your new place, then click 'Place Here'" 
+                ? "Pan the map to position your new place, then tap 'Place Here'" 
                 : "Pin places you've been, organize them into lists, and discover new spots through friends."}
             </p>
           </div>
+          {/* Mobile: Full-width buttons for easier tapping on iOS Safari */}
           {mode === "VIEW" && (
             <button
               onClick={handleAddPlace}
-              className="rounded-lg border border-accent/60 bg-accent/15 px-6 py-2 text-sm font-medium text-accent transition-colors hover:border-accent hover:bg-accent/20"
+              className="w-full rounded-lg border border-accent/60 bg-accent/15 px-6 py-3 text-base font-medium text-accent transition-colors active:bg-accent/20 sm:w-auto sm:py-2 sm:text-sm hover:border-accent hover:bg-accent/20"
             >
               Add Place
             </button>
           )}
           {mode === "ADD_PLACE" && (
-            <div className="flex gap-3">
+            <div className="flex gap-3 sm:flex-row">
               <button
                 onClick={handleCancel}
-                className="rounded-lg border border-surface/60 bg-surface/30 px-6 py-2 text-sm font-medium text-text transition-colors hover:border-accent/60 hover:bg-surface/50"
+                className="flex-1 rounded-lg border border-surface/60 bg-surface/30 px-6 py-3 text-base font-medium text-text transition-colors active:bg-surface/50 sm:flex-none sm:py-2 sm:text-sm hover:border-accent/60 hover:bg-surface/50"
               >
                 Cancel
               </button>
               <button
                 onClick={handlePlaceHere}
                 disabled={!pendingCoordinates}
-                className="rounded-lg border border-accent/60 bg-accent/15 px-6 py-2 text-sm font-medium text-accent transition-colors hover:border-accent hover:bg-accent/20 disabled:opacity-50"
+                className="flex-1 rounded-lg border border-accent/60 bg-accent/15 px-6 py-3 text-base font-medium text-accent transition-colors active:bg-accent/20 disabled:opacity-50 sm:flex-none sm:py-2 sm:text-sm hover:border-accent hover:bg-accent/20"
               >
                 Place Here
               </button>
@@ -226,8 +228,10 @@ export default function UserDashboardPage() {
           </div>
         )}
 
-        {/* Map container - full width, fixed height for stability */}
-        <div className="relative h-[600px] w-full overflow-hidden rounded-lg border-2 border-accent/20 bg-bg/40 shadow-inner">
+        {/* Map container - Mobile: Responsive height using viewport units that respect iOS Safari dynamic viewport */}
+        {/* Mobile: Uses 50vh with 400px minimum to ensure map is visible even with Safari UI chrome */}
+        {/* Tablet: 500px, Desktop: 600px - fixed heights for stability on larger screens */}
+        <div className="relative w-full overflow-hidden rounded-lg border-2 border-accent/20 bg-bg/40 shadow-inner h-[50vh] min-h-[400px] sm:h-[500px] md:h-[600px]">
           {loading ? (
             <div className="flex h-full items-center justify-center">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent/30 border-t-accent"></div>

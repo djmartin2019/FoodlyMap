@@ -288,11 +288,11 @@ function RootLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-bg text-text flex flex-col">
+    <div className="min-h-screen bg-bg text-text flex flex-col" style={{ minHeight: '100dvh' }}>
       {/* Global auth redirect handler for invite/magic links */}
       <AuthRedirectHandler />
-      <nav className="sticky top-0 z-10 border-b border-surface bg-bg/90 backdrop-blur" aria-label="Main navigation">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4">
+      <nav className="sticky top-0 z-10 border-b border-surface bg-bg/90 backdrop-blur" aria-label="Main navigation" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
           <Link
             to={user ? "/dashboard" : "/"}
             className="text-lg font-semibold tracking-wide text-text transition-colors hover:text-accent"
