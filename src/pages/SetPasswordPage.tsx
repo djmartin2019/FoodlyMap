@@ -169,29 +169,28 @@ export default function SetPasswordPage() {
       console.log("User created at:", currentUser.created_at);
 
       // Skip session refresh for invite links - session is already valid
-      // refreshSession() can hang in some cases, so we'll proceed without it
       console.log("Skipping session refresh (session should already be valid for invite links)");
 
-      // Step 1: Try to update password (fire-and-forget, non-blocking)
-      // For invite links, password update may hang - we'll proceed with profile creation immediately
-      // User can set password later via password reset if needed
-      console.log("Starting password update (non-blocking)...");
-      
-      // Fire-and-forget password update - don't wait for it
-      supabase.auth.updateUser({ password: password }).then(
-        ({ error, data }) => {
-          if (error) {
-            console.error("Password update error (background):", error);
-          } else {
-            console.log("Password updated successfully (background)", data);
-          }
-        }
-      ).catch((err) => {
-        console.warn("Password update failed (background):", err);
-      });
+      // Step 1: Update password FIRST (before profile creation)
+      // Do this synchronously to ensure it completes before we create the profile
+      console.log("Updating password...");
+      try {
+        const { error: passwordError } = await supabase.auth.updateUser({
+          password: password,
+        });
 
-      // Proceed immediately to profile creation - don't wait for password update
-      console.log("Proceeding with profile creation (password update running in background)...");
+        if (passwordError) {
+          console.error("Password update error:", passwordError);
+          // Don't block - continue with profile creation
+          // User can set password later via password reset if needed
+          console.warn("Continuing with profile creation despite password update error");
+        } else {
+          console.log("Password updated successfully");
+        }
+      } catch (passwordErr) {
+        console.error("Password update exception:", passwordErr);
+        // Continue anyway - profile creation is more important
+      }
 
       // Step 2: Insert or update profile with onboarding_complete = true
       const profileData = {
@@ -206,29 +205,32 @@ export default function SetPasswordPage() {
 
       console.log("Creating profile:", profileData);
 
-      // Retry logic for profile creation (AbortError can happen due to network/RLS issues)
-      let profileDataResult;
-      let profileError;
-      let retries = 0;
-      const maxRetries = 3;
+      // Step 2: Create profile - simple INSERT, no retries, no SELECT
+      // Just insert the profile data - if it fails, show error
+      console.log("Creating profile...");
+      
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .insert(profileData);
 
-      while (retries < maxRetries) {
-        try {
-          console.log(`Attempting profile creation (attempt ${retries + 1}/${maxRetries})...`);
-          
-          // Try INSERT first (for new profiles), then UPDATE if it fails due to conflict
-          // This avoids RLS issues with upsert SELECT checks
-          let result;
-          
-          // First attempt: try INSERT without SELECT to avoid RLS issues
-          result = await supabase
-            .from("profiles")
-            .insert(profileData);
-          
-          // If insert fails due to conflict, try update
-          if (result.error && (result.error.code === "23505" || result.error.message?.includes("duplicate"))) {
-            console.log("Profile exists, trying UPDATE instead...");
-            result = await supabase
+      if (profileError) {
+        console.error("Profile creation error:", profileError);
+        console.error("Error code:", profileError.code);
+        console.error("Error message:", profileError.message);
+        
+        // Handle unique constraint violation (username or id)
+        if (
+          profileError.code === "23505" ||
+          profileError.message?.includes("duplicate") ||
+          profileError.message?.includes("unique")
+        ) {
+          // Check if it's username or id conflict
+          if (profileError.message?.includes("username")) {
+            setErrors({ username: "This username is already taken. Please choose another." });
+          } else {
+            // ID conflict - profile might already exist, try UPDATE instead
+            console.log("Profile exists, trying UPDATE...");
+            const { error: updateError } = await supabase
               .from("profiles")
               .update({
                 username: profileData.username,
@@ -238,91 +240,27 @@ export default function SetPasswordPage() {
                 onboarding_complete: profileData.onboarding_complete,
               })
               .eq("id", profileData.id);
-          }
 
-          profileError = result.error;
-
-          // If no error, verify by reading back the profile
-          if (!profileError) {
-            console.log("Profile write succeeded, verifying...");
-            // Verify by reading the profile back
-            const verifyResult = await supabase
-              .from("profiles")
-              .select("*")
-              .eq("id", profileData.id)
-              .single();
-            
-            if (verifyResult.error) {
-              console.warn("Profile write succeeded but verification failed:", verifyResult.error);
-              // This is OK - the write might have succeeded even if we can't read it back
-              profileDataResult = profileData; // Use the data we sent
-            } else {
-              profileDataResult = verifyResult.data;
-              console.log("Profile creation and verification succeeded!");
+            if (updateError) {
+              console.error("Profile update also failed:", updateError);
+              setErrors({
+                general: `Failed to save profile: ${updateError.message || "Please try again."}`,
+              });
+              setLoading(false);
+              return;
             }
-            break;
+            console.log("Profile updated successfully");
           }
-
-          // Check if it's an AbortError
-          const isAbortError =
-            profileError.message?.includes("AbortError") ||
-            profileError.code === "ABORTED" ||
-            profileError.message?.includes("aborted");
-
-          if (isAbortError) {
-            retries++;
-            console.warn(`Profile creation aborted, retrying (${retries}/${maxRetries})...`);
-            // Wait a bit before retrying (exponential backoff)
-            await new Promise((resolve) => setTimeout(resolve, 1000 * retries));
-            continue;
-          }
-
-          // For other errors, break and handle below
-          break;
-        } catch (err) {
-          // If it's an AbortError in the catch, retry
-          const isAbortError =
-            err instanceof Error &&
-            (err.message.includes("AbortError") || err.message.includes("aborted"));
-
-          if (isAbortError) {
-            retries++;
-            console.warn(`Profile creation exception, retrying (${retries}/${maxRetries})...`);
-            await new Promise((resolve) => setTimeout(resolve, 1000 * retries));
-            continue;
-          }
-          // For other exceptions, break
-          profileError = err as any;
-          break;
-        }
-      }
-
-      if (profileError) {
-        console.error("Profile creation error after retries:", profileError);
-        // Handle unique constraint violation
-        if (
-          profileError.code === "23505" ||
-          profileError.message?.includes("duplicate") ||
-          profileError.message?.includes("unique")
-        ) {
-          setErrors({ username: "This username is already taken. Please choose another." });
-        } else if (profileError.message?.includes("AbortError")) {
-          // If still aborting after retries, show a message but try to continue
-          console.error("Profile creation still failing after retries - this may be a network issue");
-          setErrors({
-            general:
-              "Network error while saving profile. Please refresh and try again, or contact support if the issue persists.",
-          });
         } else {
           setErrors({
             general: `Failed to save profile: ${profileError.message || "Please try again."}`,
           });
+          setLoading(false);
+          return;
         }
-        setLoading(false);
-        return;
+      } else {
+        console.log("Profile created successfully");
       }
-
-      console.log("Profile created successfully:", profileDataResult);
 
       // Update auth context onboarding status
       await checkOnboardingStatus();
