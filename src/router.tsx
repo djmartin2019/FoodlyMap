@@ -89,7 +89,7 @@ const loginRoute = createRoute({
       }
       // Ignore AbortError and other errors - allow page to load normally
       // AbortError happens when navigation is cancelled, which is expected behavior
-      if (error?.name !== "AbortError") {
+      if (error instanceof Error && error.name !== "AbortError") {
         console.error("Error in login route guard:", error);
       }
     }
@@ -151,7 +151,7 @@ const setPasswordRoute = createRoute({
         throw error;
       }
       // Ignore AbortError - it happens when navigation is cancelled
-      if (error?.name === "AbortError") {
+      if (error instanceof Error && error.name === "AbortError") {
         return; // Allow page to load
       }
       // Otherwise, redirect to login on error
