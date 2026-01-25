@@ -70,8 +70,14 @@ export default function DashboardPage() {
     );
   }
 
+  // Route guard handles authentication - if we reach here, user should exist
+  // Show loading state if user is not yet available (shouldn't happen due to auth bootstrap)
   if (!user) {
-    return null; // Will redirect via useEffect
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent/30 border-t-accent"></div>
+      </div>
+    );
   }
 
   const displayName = profile

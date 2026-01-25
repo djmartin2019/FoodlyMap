@@ -53,21 +53,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Initialize auth state on mount
+  // CRITICAL: This effect runs exactly once and resolves the initial auth state
+  // The loading state remains true until this completes, preventing the router
+  // from rendering until auth is fully resolved (preventing black screens)
   useEffect(() => {
-    // Check for existing session
+    let mounted = true; // Track if component is still mounted
+    
+    // Check for existing session (restores from localStorage on page load)
+    // This runs in parallel with onAuthStateChange, but we use it as a fallback
+    // to ensure loading is set to false even if onAuthStateChange hasn't fired yet
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      // Only update state if component is still mounted
+      if (!mounted) return;
+      
+      // Update state (onAuthStateChange might have already done this, but that's OK)
       setSession(session);
       setUser(session?.user ?? null);
       
       // Check onboarding status if user exists
       if (session?.user) {
         const isComplete = await checkOnboardingStatus(session.user.id);
-        setOnboardingComplete(isComplete);
+        if (mounted) {
+          setOnboardingComplete(isComplete);
+          setLoading(false); // Auth is now resolved - safe to render router
+        }
       } else {
-        setOnboardingComplete(null);
+        if (mounted) {
+          setOnboardingComplete(null);
+          setLoading(false); // No session - still safe to render router (will show login)
+        }
       }
-      
-      setLoading(false);
+    }).catch((error) => {
+      // If getSession fails, still set loading to false so app can render
+      console.error("Error getting session:", error);
+      if (mounted) {
+        setLoading(false);
+      }
     });
 
     // Global auth state listener
@@ -76,6 +97,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Supabase processes the hash and fires a SIGNED_IN event. We listen for this
     // event to check onboarding status and trigger redirects via AuthRedirectHandler.
     // 
+    // IMPORTANT: onAuthStateChange fires immediately when registered with the current session.
+    // This initial event (often INITIAL_SESSION) must also set loading to false.
+    // 
     // IMPORTANT: PASSWORD_RECOVERY events must be handled explicitly.
     // When a user clicks a password reset link, Supabase authenticates them and emits
     // a PASSWORD_RECOVERY event. We must redirect to /reset-password immediately.
@@ -83,6 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session) => {
+      // Only process if component is still mounted
+      if (!mounted) return;
+      
       // Update session and user state immediately
       setSession(session);
       setUser(session?.user ?? null);
@@ -99,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const currentPath = window.location.pathname;
         if (currentPath === "/reset-password") {
           console.log("PASSWORD_RECOVERY event detected - session established");
-          setLoading(false);
+          if (mounted) setLoading(false);
           return; // Don't check onboarding for recovery sessions
         } else {
           // Recovery session detected but not on reset-password page
@@ -108,10 +135,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           supabase.auth.signOut().catch(() => {
             // Ignore errors - we're just cleaning up
           });
-          setSession(null);
-          setUser(null);
-          setOnboardingComplete(null);
-          setLoading(false);
+          if (mounted) {
+            setSession(null);
+            setUser(null);
+            setOnboardingComplete(null);
+            setLoading(false);
+          }
           return;
         }
       }
@@ -121,25 +150,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === "SIGNED_IN" && session?.user) {
         // Check onboarding status from profiles table
         const isComplete = await checkOnboardingStatus(session.user.id);
-        setOnboardingComplete(isComplete);
-        setLoading(false);
+        if (mounted) {
+          setOnboardingComplete(isComplete);
+          setLoading(false);
+        }
         // Navigation is handled by AuthRedirectHandler component based on onboarding status
       } else if (event === "SIGNED_OUT") {
-        setOnboardingComplete(null);
-        setLoading(false);
+        if (mounted) {
+          setOnboardingComplete(null);
+          setLoading(false);
+        }
       } else if (session?.user) {
-        // For other events (like TOKEN_REFRESHED), update status but don't redirect
+        // For other events (like TOKEN_REFRESHED, INITIAL_SESSION), update status
         const isComplete = await checkOnboardingStatus(session.user.id);
-        setOnboardingComplete(isComplete);
-        setLoading(false);
+        if (mounted) {
+          setOnboardingComplete(isComplete);
+          setLoading(false);
+        }
       } else {
-        setOnboardingComplete(null);
-        setLoading(false);
+        // No session (initial load with no auth, or after sign out)
+        // CRITICAL: Always set loading to false, even if no session exists
+        // This ensures the router renders even when user is not authenticated
+        if (mounted) {
+          setOnboardingComplete(null);
+          setLoading(false);
+        }
       }
     });
 
-    // Cleanup subscription on unmount
-    return () => subscription.unsubscribe();
+    // Safety timeout: Ensure loading is set to false after max 3 seconds
+    // This prevents the app from being stuck in loading state if something goes wrong
+    const timeoutId = setTimeout(() => {
+      if (mounted) {
+        console.warn("Auth initialization timeout - forcing loading to false");
+        setLoading(false);
+      }
+    }, 3000);
+
+    // Cleanup subscription and timeout on unmount
+    return () => {
+      mounted = false;
+      clearTimeout(timeoutId);
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Expose checkOnboardingStatus for manual checks
@@ -185,12 +238,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Sign out function
-  // Clears session and all auth state immediately for instant UI feedback
+  // Clears session and all auth state, then signs out from Supabase
+  // IMPORTANT: This must be awaited to ensure auth state change event fires
+  // before navigation occurs. If navigation happens too early, the router
+  // may update the URL but not re-render because auth state is still transitioning.
   const signOut = async () => {
     // Clear state immediately for instant UI feedback
     setUser(null);
     setSession(null);
     setOnboardingComplete(null);
+    setLoading(true); // Set loading to prevent navigation during transition
     
     // Clear Supabase storage immediately
     try {
@@ -207,14 +264,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.warn("Error clearing storage:", storageError);
     }
     
-    // Sign out from Supabase in background (non-blocking)
-    // Don't wait for it - state is already cleared for instant UI update
-    supabase.auth.signOut().catch((error: any) => {
-      // Log but don't block - state is already cleared
+    // Sign out from Supabase and await completion
+    // This ensures the SIGNED_OUT event fires and auth state stabilizes
+    // before navigation occurs
+    try {
+      await supabase.auth.signOut();
+    } catch (error: any) {
+      // Log but continue - state is already cleared
       if (error?.name !== "AbortError") {
-        console.warn("Supabase sign out error (non-blocking):", error);
+        console.warn("Supabase sign out error:", error);
       }
-    });
+    } finally {
+      // Set loading to false after sign out completes
+      // This allows navigation to proceed once auth state is stable
+      setLoading(false);
+    }
   };
 
   const value: AuthContextType = {

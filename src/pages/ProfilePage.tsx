@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "../lib/supabase";
-import DashboardMap from "../components/DashboardMap";
 
 interface Profile {
   id: string;
@@ -14,9 +12,8 @@ interface Profile {
   created_at: string;
 }
 
-export default function AppPage() {
-  const { user, signOut } = useAuth();
-  const navigate = useNavigate();
+export default function ProfilePage() {
+  const { user } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,20 +52,6 @@ export default function AppPage() {
     fetchProfile();
   }, [user]);
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch (error: any) {
-      // AbortError is common when navigation happens - ignore it
-      if (error?.name !== "AbortError") {
-        console.error("Error during sign out:", error);
-      }
-    } finally {
-      // Always navigate, even if signOut fails or is aborted
-      navigate({ to: "/login", replace: true });
-    }
-  };
-
   // Get display name (first name, or fallback to username or email)
   const getDisplayName = () => {
     if (profile?.first_name) {
@@ -102,25 +85,17 @@ export default function AppPage() {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col px-6 py-12 md:px-8">
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="mb-2 text-4xl font-bold tracking-tight text-accent md:text-5xl">
-            Welcome back, {getDisplayName()}!
-          </h1>
-          <p className="text-text/70">
-            Your Foodly Map dashboard
-          </p>
-        </div>
-        <button
-          onClick={handleSignOut}
-          className="rounded-lg border border-surface/60 bg-surface/30 px-4 py-2 text-sm font-medium text-text transition-colors hover:border-accent/60 hover:bg-surface/50"
-        >
-          Sign Out
-        </button>
+      <div className="mb-8">
+        <h1 className="mb-2 text-4xl font-bold tracking-tight text-accent md:text-5xl">
+          Welcome back, {getDisplayName()}!
+        </h1>
+        <p className="text-text/70">
+          Your profile information
+        </p>
       </div>
 
       {/* Profile Information Card */}
-      <div className="mb-6 rounded-2xl border border-surface/60 bg-surface/30 p-8 shadow-neon-sm">
+      <div className="rounded-2xl border border-surface/60 bg-surface/30 p-8 shadow-neon-sm">
         <h2 className="mb-6 text-2xl font-semibold text-accent">Profile Information</h2>
         
         {error ? (
@@ -167,18 +142,6 @@ export default function AppPage() {
         ) : (
           <p className="text-text/60">No profile information available.</p>
         )}
-      </div>
-
-      {/* Map Section - Full width and height */}
-      <div className="rounded-2xl border border-surface/60 bg-surface/30 p-8 shadow-neon-sm">
-        <h2 className="mb-4 text-2xl font-semibold text-accent">Your Food Map</h2>
-        <p className="mb-6 text-text/80">
-          Explore and manage your personal food collection on the map.
-        </p>
-        {/* Map container - full width, fixed height for stability */}
-        <div className="relative h-[600px] w-full overflow-hidden rounded-lg border-2 border-accent/20 bg-bg/40 shadow-inner">
-          <DashboardMap />
-        </div>
       </div>
     </div>
   );

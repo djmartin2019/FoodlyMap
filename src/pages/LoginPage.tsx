@@ -12,7 +12,7 @@ export default function LoginPage() {
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
-  const { signIn } = useAuth();
+  const { signIn, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   // Handle login form submission
@@ -31,9 +31,20 @@ export default function LoginPage() {
       return;
     }
 
-    // Success: Check onboarding status and navigate immediately
-    // This is faster than waiting for AuthRedirectHandler or route guards
+    // Success: Wait for auth state to stabilize before navigating
+    // This prevents navigation from happening during auth state transitions,
+    // which can cause the router to update the URL but not re-render.
+    // The auth context's onAuthStateChange will fire SIGNED_IN event,
+    // which updates the auth state. We wait for loading to complete.
     try {
+      // Wait for auth loading to complete (max 1 second)
+      // This ensures the auth context has finished processing the sign-in event
+      const maxWait = 1000;
+      const startTime = Date.now();
+      while (authLoading && (Date.now() - startTime) < maxWait) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
         setLoading(false);
@@ -52,11 +63,16 @@ export default function LoginPage() {
 
       setLoading(false);
       // Navigate directly to the correct page based on onboarding status
-      navigate({ to: isComplete ? "/app" : "/set-password", replace: true });
+      // Use requestAnimationFrame to ensure DOM is ready for navigation
+      requestAnimationFrame(() => {
+        navigate({ to: isComplete ? "/dashboard" : "/set-password", replace: true });
+      });
     } catch (err) {
-      // If check fails, default to /app (route guard will handle it)
+      // If check fails, default to /dashboard (route guard will handle it)
       setLoading(false);
-      navigate({ to: "/app", replace: true });
+      requestAnimationFrame(() => {
+        navigate({ to: "/dashboard", replace: true });
+      });
     }
   };
 

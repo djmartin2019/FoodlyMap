@@ -27,6 +27,12 @@ export function AuthRedirectHandler() {
   const isInitialAuthEvent = useRef(false); // Track if this is a new sign-in event
 
   useEffect(() => {
+    // CRITICAL: Only run redirect logic when auth state is stable (not loading)
+    // This prevents navigation from firing during auth state transitions,
+    // which can cause the router to update the URL but not re-render the UI
+    if (loading || isNavigating.current) {
+      return;
+    }
 
     const currentPath = routerState.location.pathname;
     const currentUserId = user?.id || null;
@@ -50,11 +56,6 @@ export function AuthRedirectHandler() {
       hasRedirected.current = false;
       previousUserRef.current = null;
       isInitialAuthEvent.current = false;
-      return;
-    }
-
-    // Don't redirect while loading or if navigation is already in progress
-    if (loading || isNavigating.current) {
       return;
     }
 
@@ -118,7 +119,7 @@ export function AuthRedirectHandler() {
 
       // Only redirect if onboarding is explicitly false (new user from invite link)
       // If null, the route guard will handle it
-      // If true, the route guard will redirect to /app
+      // If true, the route guard will redirect to /dashboard
       if (onboardingComplete === false) {
         hasRedirected.current = true;
         isNavigating.current = true;
@@ -131,7 +132,7 @@ export function AuthRedirectHandler() {
             isInitialAuthEvent.current = false; // Reset after redirect
           });
       } else if (onboardingComplete === true) {
-        // If onboarding is complete, route guard will handle redirect to /app
+        // If onboarding is complete, route guard will handle redirect to /dashboard
         hasRedirected.current = true; // Mark as handled
         isInitialAuthEvent.current = false; // Reset
       }

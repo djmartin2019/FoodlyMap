@@ -44,6 +44,30 @@ body {
   color: #39ff88;
 }
 
+/* Mapbox popup styling for place markers */
+.place-popup .mapboxgl-popup-content {
+  background: #0b1210;
+  border: 1px solid rgba(57, 255, 136, 0.3);
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 0 12px rgba(57, 255, 136, 0.2);
+  color: #e9fff2;
+}
+
+.place-popup .mapboxgl-popup-tip {
+  border-top-color: #0b1210;
+}
+
+.place-popup .mapboxgl-popup-close-button {
+  color: #e9fff2;
+  font-size: 20px;
+  padding: 4px 8px;
+}
+
+.place-popup .mapboxgl-popup-close-button:hover {
+  color: #39ff88;
+}
+
 /* Drop shadow for hero title glow effect */
 .drop-shadow-glow {
   filter: drop-shadow(0 0 8px rgba(57, 255, 136, 0.4));

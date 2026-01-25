@@ -10,7 +10,8 @@ import {
 import DashboardPage from "./pages/DashboardPage";
 import ContactPage from "./pages/ContactPage";
 import LoginPage from "./pages/LoginPage";
-import AppPage from "./pages/AppPage";
+import UserDashboardPage from "./pages/UserDashboardPage";
+import ProfilePage from "./pages/ProfilePage";
 import RequestAccessPage from "./pages/RequestAccessPage";
 import SetPasswordPage from "./pages/SetPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
@@ -90,7 +91,7 @@ const loginRoute = createRoute({
         // Redirect based on onboarding status
         // Only redirect to /set-password if onboarding is explicitly incomplete
         throw redirect({
-          to: isComplete ? "/app" : "/set-password",
+          to: isComplete ? "/dashboard" : "/set-password",
         });
       } catch (profileErr) {
         // If this is a redirect, re-throw it
@@ -144,12 +145,12 @@ const setPasswordRoute = createRoute({
             .eq("id", session.user.id)
             .single();
 
-          // If profile exists and onboarding is explicitly true, redirect to app
+          // If profile exists and onboarding is explicitly true, redirect to dashboard
           if (!profileError && profile) {
             const isComplete = profile.onboarding_complete ?? false;
             if (isComplete === true) {
               throw redirect({
-                to: "/app",
+                to: "/dashboard",
               });
             }
           }
@@ -194,13 +195,40 @@ const resetPasswordRoute = createRoute({
   // This allows Supabase time to process the hash from the recovery link
 });
 
-// Protected route (requires authentication)
-const appRoute = createRoute({
+// Protected dashboard route (requires authentication) - shows map
+// NOTE: Auth is already resolved when this guard runs (router is gated behind auth loading)
+// This guard can safely check session - it will be fast since auth is in memory
+const userDashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/app",
-  component: AppPage,
+  path: "/dashboard",
+  component: UserDashboardPage,
   beforeLoad: async () => {
     // Check authentication before allowing access
+    // Auth is already resolved (router is gated), so this check is fast
+    const { supabase } = await import("./lib/supabase");
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    // If no session, redirect to login
+    if (!session) {
+      throw redirect({
+        to: "/login",
+      });
+    }
+  },
+});
+
+// Protected profile route (requires authentication) - shows profile info
+// NOTE: Auth is already resolved when this guard runs (router is gated behind auth loading)
+// This guard can safely check session - it will be fast since auth is in memory
+const profileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/profile",
+  component: ProfilePage,
+  beforeLoad: async () => {
+    // Check authentication before allowing access
+    // Auth is already resolved (router is gated), so this check is fast
     const { supabase } = await import("./lib/supabase");
     const {
       data: { session },
@@ -222,7 +250,8 @@ const routeTree = rootRoute.addChildren([
   requestAccessRoute,
   setPasswordRoute,
   resetPasswordRoute,
-  appRoute,
+  userDashboardRoute,
+  profileRoute,
 ]);
 
 export const router = createRouter({ routeTree });
@@ -235,18 +264,26 @@ function RootLayout() {
 
   const handleSignOut = async () => {
     try {
+      // Sign out and wait for it to complete
+      // The signOut function now properly awaits Supabase signOut and sets loading state
+      // This ensures the SIGNED_OUT event fires and auth state stabilizes before navigation
       await signOut();
-      // Navigate immediately after sign out completes
-      // Use replace to avoid back-button issues
-      navigate({ to: "/login", replace: true });
+      
+      // Use requestAnimationFrame to ensure DOM is ready for navigation
+      // This prevents the router from updating the URL but not re-rendering
+      requestAnimationFrame(() => {
+        navigate({ to: "/login", replace: true });
+      });
     } catch (error: any) {
       // Even if signOut fails, navigate to login
       // AbortError is common when navigation happens - ignore it
       if (error?.name !== "AbortError") {
         console.error("Error during sign out:", error);
       }
-      // Still navigate even on error
-      navigate({ to: "/login", replace: true });
+      // Still navigate even on error, using requestAnimationFrame for consistency
+      requestAnimationFrame(() => {
+        navigate({ to: "/login", replace: true });
+      });
     }
   };
 
@@ -257,9 +294,9 @@ function RootLayout() {
       <nav className="sticky top-0 z-10 border-b border-surface bg-bg/90 backdrop-blur" aria-label="Main navigation">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4">
           <Link
-            to="/"
+            to={user ? "/dashboard" : "/"}
             className="text-lg font-semibold tracking-wide text-text transition-colors hover:text-accent"
-            aria-label="Foodly Map home"
+            aria-label={user ? "Foodly Map dashboard" : "Foodly Map home"}
           >
             Foodly Map
           </Link>
@@ -267,10 +304,16 @@ function RootLayout() {
             {user ? (
               <>
                 <Link
-                  to="/app"
+                  to="/dashboard"
                   className="text-sm text-text/70 transition-colors hover:text-accent"
                 >
-                  App
+                  Dashboard
+                </Link>
+                <Link
+                  to="/profile"
+                  className="text-sm text-text/70 transition-colors hover:text-accent"
+                >
+                  Profile
                 </Link>
                 <button
                   onClick={handleSignOut}
