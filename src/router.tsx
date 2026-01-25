@@ -5,15 +5,14 @@ import {
   createRoute,
   createRouter,
   redirect,
+  useNavigate,
 } from "@tanstack/react-router";
-import HomePage from "./pages/HomePage"; // Home page with map
-import DashboardPage from "./pages/DashboardPage"; // User dashboard
+import DashboardPage from "./pages/DashboardPage";
 import ContactPage from "./pages/ContactPage";
 import LoginPage from "./pages/LoginPage";
 import AppPage from "./pages/AppPage";
 import RequestAccessPage from "./pages/RequestAccessPage";
 import SetPasswordPage from "./pages/SetPasswordPage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { useAuth } from "./contexts/AuthContext";
 import { AuthRedirectHandler } from "./components/AuthRedirectHandler";
 
@@ -23,10 +22,10 @@ const rootRoute = createRootRoute({
 });
 
 // Public routes (accessible without authentication)
-const homeRoute = createRoute({
+const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  component: HomePage,
+  component: DashboardPage,
 });
 
 const contactRoute = createRoute({
@@ -74,7 +73,7 @@ const loginRoute = createRoute({
 
         // Redirect based on onboarding status
         throw redirect({
-          to: isComplete ? "/dashboard" : "/set-password",
+          to: isComplete ? "/app" : "/set-password",
         });
       } catch (profileErr) {
         // If this is a redirect, re-throw it
@@ -133,7 +132,7 @@ const setPasswordRoute = createRoute({
             const isComplete = profile.onboarding_complete ?? false;
             if (isComplete) {
               throw redirect({
-                to: "/dashboard",
+                to: "/app",
               });
             }
           }
@@ -164,69 +163,33 @@ const setPasswordRoute = createRoute({
   },
 });
 
-// Protected route (requires authentication) - Dashboard
-const dashboardRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/dashboard",
-  component: DashboardPage,
-  beforeLoad: async () => {
-    // Check authentication before allowing access
-    const { supabase } = await import("./lib/supabase");
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    // If no session, redirect to login
-    if (!session) {
-      throw redirect({
-        to: "/login",
-      });
-    }
-  },
-});
-
-// Reset password route (requires authentication from password reset link)
-const resetPasswordRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/reset-password",
-  component: ResetPasswordPage,
-  beforeLoad: async () => {
-    // Check authentication before allowing access
-    const { supabase } = await import("./lib/supabase");
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    // If no session, redirect to login
-    if (!session) {
-      throw redirect({
-        to: "/login",
-      });
-    }
-  },
-});
-
-// Protected route (requires authentication) - Legacy app route redirects to dashboard
+// Protected route (requires authentication)
 const appRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/app",
   component: AppPage,
   beforeLoad: async () => {
-    // Redirect to dashboard
-    throw redirect({
-      to: "/dashboard",
-    });
+    // Check authentication before allowing access
+    const { supabase } = await import("./lib/supabase");
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    // If no session, redirect to login
+    if (!session) {
+      throw redirect({
+        to: "/login",
+      });
+    }
   },
 });
 
 const routeTree = rootRoute.addChildren([
-  homeRoute,
+  dashboardRoute,
   contactRoute,
   loginRoute,
   requestAccessRoute,
   setPasswordRoute,
-  resetPasswordRoute,
-  dashboardRoute,
   appRoute,
 ]);
 
@@ -236,16 +199,17 @@ function RootLayout() {
   const currentYear = new Date().getFullYear();
   // Use auth context to show/hide navigation items
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   const handleSignOut = async () => {
     try {
       await signOut();
-      // Use hard redirect to ensure all state is cleared
-      window.location.href = "/login";
+      // Navigate after sign out completes
+      navigate({ to: "/login", replace: true });
     } catch (error) {
-      // Even if signOut fails, try to redirect
+      // Even if signOut fails, try to navigate
       console.error("Error during sign out:", error);
-      window.location.href = "/login";
+      navigate({ to: "/login", replace: true });
     }
   };
 
@@ -266,10 +230,10 @@ function RootLayout() {
             {user ? (
               <>
                 <Link
-                  to="/dashboard"
+                  to="/app"
                   className="text-sm text-text/70 transition-colors hover:text-accent"
                 >
-                  Dashboard
+                  App
                 </Link>
                 <button
                   onClick={handleSignOut}

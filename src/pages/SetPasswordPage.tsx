@@ -282,12 +282,12 @@ export default function SetPasswordPage() {
         console.log("Profile created successfully");
       }
 
-      // Step 3: Send password reset email
+      // Step 3: Send password reset email via Supabase
       console.log("Sending password reset email...");
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         currentUser.email!,
         {
-          redirectTo: `${window.location.origin}/reset-password`,
+          redirectTo: `${window.location.origin}/login`,
         }
       );
 
@@ -505,7 +505,7 @@ export default function SetPasswordPage() {
             </div>
           )}
 
-          {/* Submit Button */}
+              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={loading || checkingUsername}
