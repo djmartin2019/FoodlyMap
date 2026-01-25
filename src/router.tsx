@@ -5,7 +5,6 @@ import {
   createRoute,
   createRouter,
   redirect,
-  useNavigate,
 } from "@tanstack/react-router";
 import HomePage from "./pages/HomePage"; // Home page with map
 import DashboardPage from "./pages/DashboardPage"; // User dashboard
