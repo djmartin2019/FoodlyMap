@@ -159,7 +159,7 @@ export default function SetPasswordPage() {
 
       // Refresh session before password update to ensure we have a valid session
       console.log("Refreshing session...");
-      const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession();
+      const { error: sessionError } = await supabase.auth.refreshSession();
       if (sessionError) {
         console.error("Session refresh error:", sessionError);
         // Continue anyway - the session might still be valid
