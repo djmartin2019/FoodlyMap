@@ -111,26 +111,22 @@ export default function ResetPasswordPage() {
 
       console.log("Password updated successfully");
 
-      // Step 2: Sign out to invalidate the recovery session
+      // Step 2: Sign out to invalidate the recovery session (non-blocking)
       // This prevents limbo states and ensures clean auth state
-      // Use a timeout to prevent hanging - redirect even if signOut fails
-      try {
-        await Promise.race([
-          supabase.auth.signOut(),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("Sign out timeout")), 2000)
-          )
-        ]);
-        console.log("Signed out successfully");
-      } catch (signOutError) {
-        // Log but don't block - we still want to redirect
-        // The recovery session will expire anyway
-        console.warn("Sign out completed (may have timed out):", signOutError);
-      }
+      // Fire and forget - don't wait for it to complete
+      supabase.auth.signOut()
+        .then(() => {
+          console.log("Signed out successfully");
+        })
+        .catch((signOutError) => {
+          console.warn("Sign out error (non-blocking):", signOutError);
+        });
 
-      // Step 3: Redirect to login page
+      // Step 3: Redirect immediately to login page
+      // Don't wait for signOut - redirect right away
       // Use window.location for hard redirect to ensure it always happens
       // This clears any remaining state and ensures clean navigation
+      console.log("Redirecting to login...");
       window.location.href = "/login";
     } catch (err) {
       console.error("Unexpected error during password reset:", err);
