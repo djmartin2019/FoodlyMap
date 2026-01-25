@@ -7,12 +7,14 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
-import DashboardPage from "./pages/DashboardPage";
+import HomePage from "./pages/HomePage"; // Home page with map
+import DashboardPage from "./pages/DashboardPage"; // User dashboard
 import ContactPage from "./pages/ContactPage";
 import LoginPage from "./pages/LoginPage";
 import AppPage from "./pages/AppPage";
 import RequestAccessPage from "./pages/RequestAccessPage";
 import SetPasswordPage from "./pages/SetPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { useAuth } from "./contexts/AuthContext";
 import { AuthRedirectHandler } from "./components/AuthRedirectHandler";
 
@@ -22,10 +24,10 @@ const rootRoute = createRootRoute({
 });
 
 // Public routes (accessible without authentication)
-const dashboardRoute = createRoute({
+const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  component: DashboardPage,
+  component: HomePage,
 });
 
 const contactRoute = createRoute({
@@ -73,7 +75,7 @@ const loginRoute = createRoute({
 
         // Redirect based on onboarding status
         throw redirect({
-          to: isComplete ? "/app" : "/set-password",
+          to: isComplete ? "/dashboard" : "/set-password",
         });
       } catch (profileErr) {
         // If this is a redirect, re-throw it
@@ -132,7 +134,7 @@ const setPasswordRoute = createRoute({
             const isComplete = profile.onboarding_complete ?? false;
             if (isComplete) {
               throw redirect({
-                to: "/app",
+                to: "/dashboard",
               });
             }
           }
@@ -163,11 +165,11 @@ const setPasswordRoute = createRoute({
   },
 });
 
-// Protected route (requires authentication)
-const appRoute = createRoute({
+// Protected route (requires authentication) - Dashboard
+const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/app",
-  component: AppPage,
+  path: "/dashboard",
+  component: DashboardPage,
   beforeLoad: async () => {
     // Check authentication before allowing access
     const { supabase } = await import("./lib/supabase");
@@ -184,12 +186,48 @@ const appRoute = createRoute({
   },
 });
 
+// Reset password route (requires authentication from password reset link)
+const resetPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/reset-password",
+  component: ResetPasswordPage,
+  beforeLoad: async () => {
+    // Check authentication before allowing access
+    const { supabase } = await import("./lib/supabase");
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    // If no session, redirect to login
+    if (!session) {
+      throw redirect({
+        to: "/login",
+      });
+    }
+  },
+});
+
+// Protected route (requires authentication) - Legacy app route redirects to dashboard
+const appRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/app",
+  component: AppPage,
+  beforeLoad: async () => {
+    // Redirect to dashboard
+    throw redirect({
+      to: "/dashboard",
+    });
+  },
+});
+
 const routeTree = rootRoute.addChildren([
-  dashboardRoute,
+  homeRoute,
   contactRoute,
   loginRoute,
   requestAccessRoute,
   setPasswordRoute,
+  resetPasswordRoute,
+  dashboardRoute,
   appRoute,
 ]);
 
@@ -204,12 +242,12 @@ function RootLayout() {
   const handleSignOut = async () => {
     try {
       await signOut();
-      // Navigate after sign out completes
-      navigate({ to: "/login", replace: true });
+      // Use hard redirect to ensure all state is cleared
+      window.location.href = "/login";
     } catch (error) {
-      // Even if signOut fails, try to navigate
+      // Even if signOut fails, try to redirect
       console.error("Error during sign out:", error);
-      navigate({ to: "/login", replace: true });
+      window.location.href = "/login";
     }
   };
 
@@ -230,10 +268,10 @@ function RootLayout() {
             {user ? (
               <>
                 <Link
-                  to="/app"
+                  to="/dashboard"
                   className="text-sm text-text/70 transition-colors hover:text-accent"
                 >
-                  App
+                  Dashboard
                 </Link>
                 <button
                   onClick={handleSignOut}

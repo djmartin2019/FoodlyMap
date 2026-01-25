@@ -40,7 +40,7 @@ export function AuthRedirectHandler() {
 
     // Don't redirect if we're already on a protected route
     const currentPath = routerState.location.pathname;
-    const protectedRoutes = ["/app", "/set-password"];
+    const protectedRoutes = ["/dashboard", "/app", "/set-password"];
     
     if (protectedRoutes.includes(currentPath)) {
       return; // Already on the right page
@@ -57,7 +57,7 @@ export function AuthRedirectHandler() {
         if (onboardingComplete === true && !isNavigating.current) {
           hasRedirected.current = true;
           isNavigating.current = true;
-          navigate({ to: "/app", replace: true }).catch(() => {
+          navigate({ to: "/dashboard", replace: true }).catch(() => {
             // Ignore navigation errors (e.g., if user navigates away)
           }).finally(() => {
             isNavigating.current = false;

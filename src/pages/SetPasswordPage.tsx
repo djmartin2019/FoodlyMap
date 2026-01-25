@@ -4,8 +4,6 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 
 interface FormErrors {
-  password?: string;
-  confirmPassword?: string;
   username?: string;
   firstName?: string;
   lastName?: string;
@@ -17,8 +15,6 @@ export default function SetPasswordPage() {
   const { user, checkOnboardingStatus } = useAuth();
   const navigate = useNavigate();
 
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [username, setUsername] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -27,6 +23,7 @@ export default function SetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [profileCreated, setProfileCreated] = useState(false);
 
   // Check if user is authenticated on mount
   useEffect(() => {
@@ -90,20 +87,6 @@ export default function SetPasswordPage() {
   // Validate form fields
   const validateForm = async (): Promise<boolean> => {
     const newErrors: FormErrors = {};
-
-    // Password validation
-    if (!password) {
-      newErrors.password = "Password is required";
-    } else if (password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
-    }
-
-    // Confirm password validation
-    if (!confirmPassword) {
-      newErrors.confirmPassword = "Please confirm your password";
-    } else if (password !== confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
-    }
 
     // Username validation
     if (!username) {
@@ -299,12 +282,33 @@ export default function SetPasswordPage() {
         console.log("Profile created successfully");
       }
 
+      // Step 3: Send password reset email
+      console.log("Sending password reset email...");
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        currentUser.email!,
+        {
+          redirectTo: `${window.location.origin}/reset-password`,
+        }
+      );
+
+      if (resetError) {
+        console.error("Error sending password reset email:", resetError);
+        // Don't block - profile is created, user can request password reset later
+        setErrors({
+          general: "Profile created, but password reset email failed to send. You can request a password reset from the login page.",
+        });
+        setLoading(false);
+        return;
+      }
+
+      console.log("Password reset email sent successfully");
+
       // Update auth context onboarding status
       await checkOnboardingStatus();
 
-      // Use hard redirect to ensure auth state is fully refreshed
-      // This prevents issues where the auth context hasn't updated yet
-      window.location.href = "/app";
+      // Show success message - profile created, check email for password reset
+      setProfileCreated(true);
+      setLoading(false);
     } catch (err) {
       console.error("Unexpected error in form submission:", err);
       setErrors({
@@ -343,57 +347,43 @@ export default function SetPasswordPage() {
   return (
     <div className="mx-auto flex min-h-[calc(100vh-200px)] w-full max-w-md items-center justify-center px-6 py-12">
       <div className="w-full rounded-2xl border border-surface/60 bg-surface/30 p-8 shadow-neon-sm md:p-12">
-        <div className="mb-8 text-center">
-          <h1 className="mb-2 text-3xl font-bold tracking-tight text-accent md:text-4xl">
-            Finish Setting Up Your Account
-          </h1>
-          <p className="text-sm text-text/70">
-            Complete your profile to get started. This is a one-time setup.
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Password */}
-          <div>
-            <label htmlFor="password" className="mb-2 block text-sm font-medium text-text">
-              Password <span className="text-text/50">(required)</span>
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="new-password"
-              disabled={loading}
-              className="w-full rounded-lg border border-surface/60 bg-bg/40 px-4 py-3 text-text placeholder:text-text/40 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
-              placeholder="At least 6 characters"
-            />
-            {errors.password && (
-              <p className="mt-1 text-xs text-red-400">{errors.password}</p>
-            )}
+        {profileCreated ? (
+          <div className="text-center">
+            <div className="mb-6">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border-2 border-accent/60 bg-accent/10">
+                <svg className="h-8 w-8 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h1 className="mb-2 text-3xl font-bold tracking-tight text-accent md:text-4xl">
+                Profile Created!
+              </h1>
+              <p className="mb-4 text-base text-text/80">
+                We've sent a password reset link to your email.
+              </p>
+              <p className="text-sm text-text/60">
+                Please check your inbox and click the link to set your password. Once you've set your password, you'll be able to sign in.
+              </p>
+            </div>
+            <button
+              onClick={() => window.location.href = "/login"}
+              className="w-full rounded-lg border-2 border-accent/60 bg-surface/80 px-6 py-3 text-base font-semibold text-accent shadow-glow transition-all duration-300 hover:-translate-y-0.5 hover:border-accent hover:bg-accent/10 hover:shadow-glow-lg"
+            >
+              Go to Sign In
+            </button>
           </div>
+        ) : (
+          <>
+            <div className="mb-8 text-center">
+              <h1 className="mb-2 text-3xl font-bold tracking-tight text-accent md:text-4xl">
+                Complete Your Profile
+              </h1>
+              <p className="text-sm text-text/70">
+                Create your account profile. We'll send you a password reset link to set your password.
+              </p>
+            </div>
 
-          {/* Confirm Password */}
-          <div>
-            <label htmlFor="confirmPassword" className="mb-2 block text-sm font-medium text-text">
-              Confirm Password <span className="text-text/50">(required)</span>
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              autoComplete="new-password"
-              disabled={loading}
-              className="w-full rounded-lg border border-surface/60 bg-bg/40 px-4 py-3 text-text placeholder:text-text/40 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
-              placeholder="Confirm your password"
-            />
-            {errors.confirmPassword && (
-              <p className="mt-1 text-xs text-red-400">{errors.confirmPassword}</p>
-            )}
-          </div>
+            <form onSubmit={handleSubmit} className="space-y-5">
 
           {/* Username */}
           <div>
@@ -516,14 +506,16 @@ export default function SetPasswordPage() {
           )}
 
           {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading || checkingUsername}
-            className="w-full rounded-lg border-2 border-accent/60 bg-surface/80 px-6 py-3 text-base font-semibold text-accent shadow-glow transition-all duration-300 hover:-translate-y-0.5 hover:border-accent hover:bg-accent/10 hover:shadow-glow-lg disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? "Setting up..." : "Complete Setup"}
-          </button>
-        </form>
+              <button
+                type="submit"
+                disabled={loading || checkingUsername}
+                className="w-full rounded-lg border-2 border-accent/60 bg-surface/80 px-6 py-3 text-base font-semibold text-accent shadow-glow transition-all duration-300 hover:-translate-y-0.5 hover:border-accent hover:bg-accent/10 hover:shadow-glow-lg disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {loading ? "Creating Account..." : "Create Account"}
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );

@@ -26,9 +26,9 @@ export default function LoginPage() {
       return;
     }
 
-    // Success: redirect to protected route
+    // Success: redirect to dashboard
     // The auth context will update, and route protection will allow access
-    navigate({ to: "/app" });
+    navigate({ to: "/dashboard" });
   };
 
   return (
