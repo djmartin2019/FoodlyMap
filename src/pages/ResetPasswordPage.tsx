@@ -18,9 +18,16 @@ export default function ResetPasswordPage() {
 
   // Check session on mount - required for password reset
   // PASSWORD_RECOVERY events create a temporary session that must be active
+  // IMPORTANT: Wait for Supabase to process the hash from the recovery link
+  // The hash might still be in the URL when this component mounts
   useEffect(() => {
     const checkSession = async () => {
+      // Give Supabase time to process the hash from the recovery link
+      // Recovery links include hash tokens that Supabase needs to process
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
       try {
+        // Check session - Supabase should have processed the hash by now
         const {
           data: { session },
           error: sessionError,
@@ -29,10 +36,13 @@ export default function ResetPasswordPage() {
         if (sessionError || !session) {
           // No session means the recovery link is invalid or expired
           console.error("No active session for password reset:", sessionError);
+          console.error("This usually means the recovery link has expired or was already used");
           navigate({ to: "/login", replace: true });
           return;
         }
 
+        // Session exists - allow user to reset password
+        console.log("Recovery session found, allowing password reset");
         setCheckingSession(false);
       } catch (error) {
         console.error("Error checking session:", error);

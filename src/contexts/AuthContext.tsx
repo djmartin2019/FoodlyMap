@@ -79,14 +79,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
 
-      // Handle PASSWORD_RECOVERY event - redirect to reset password page
+      // Handle PASSWORD_RECOVERY event
       // This event fires when user clicks password reset link from email
       // The session is a temporary recovery session that allows password update
+      // IMPORTANT: The recovery link already redirects to /reset-password via redirect_to param
+      // We should NOT redirect here - it interrupts Supabase's hash processing
+      // The route guard and component will handle navigation if needed
       if (event === "PASSWORD_RECOVERY" && session?.user) {
-        // Redirect to reset password page
-        // Use window.location for hard redirect to ensure clean state
-        window.location.href = "/reset-password";
-        return; // Don't continue processing - redirect is happening
+        // Just log - don't redirect
+        // The recovery link's redirect_to already sends user to /reset-password
+        // Supabase is still processing the hash, so we must not interrupt
+        console.log("PASSWORD_RECOVERY event detected - session established");
+        // Don't redirect - let the page that Supabase redirected to handle it
       }
 
       // Handle SIGNED_IN event (invite links, magic links, normal login)

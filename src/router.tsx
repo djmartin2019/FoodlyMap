@@ -167,44 +167,14 @@ const setPasswordRoute = createRoute({
 // Reset password route (requires active recovery session)
 // This route is accessed when user clicks password reset link from email
 // The PASSWORD_RECOVERY event creates a temporary session that allows password update
+// IMPORTANT: Don't check session in route guard - Supabase might still be processing the hash
+// Let the component handle session checking after Supabase finishes processing
 const resetPasswordRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/reset-password",
   component: ResetPasswordPage,
-  beforeLoad: async () => {
-    try {
-      // Check for active session (required for password reset)
-      // PASSWORD_RECOVERY events create a temporary session
-      const { supabase } = await import("./lib/supabase");
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-
-      // If no session, redirect to login
-      // This means the recovery link is invalid or expired
-      if (sessionError || !session) {
-        throw redirect({
-          to: "/login",
-        });
-      }
-
-      // Session exists - allow access to reset password page
-      // Component will handle the actual password update
-    } catch (error) {
-      // If redirect was thrown, re-throw it
-      if (error && typeof error === "object" && "to" in error) {
-        throw error;
-      }
-      // Ignore AbortError - it happens when navigation is cancelled
-      if (error instanceof Error && error.name === "AbortError") {
-        return; // Allow page to load
-      }
-      // Log other errors but don't crash
-      console.error("Error in reset-password route guard:", error);
-      return; // Allow page to load - component will handle session check
-    }
-  },
+  // No beforeLoad guard - component will handle session check
+  // This allows Supabase time to process the hash from the recovery link
 });
 
 // Protected route (requires authentication)
