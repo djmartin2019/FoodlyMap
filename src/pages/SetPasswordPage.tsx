@@ -154,22 +154,70 @@ export default function SetPasswordPage() {
       }
 
       console.log("Updating password for user:", currentUser.id);
+      console.log("User email:", currentUser.email);
+      console.log("User created at:", currentUser.created_at);
+
+      // Refresh session before password update to ensure we have a valid session
+      console.log("Refreshing session...");
+      const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession();
+      if (sessionError) {
+        console.error("Session refresh error:", sessionError);
+        // Continue anyway - the session might still be valid
+      } else {
+        console.log("Session refreshed successfully");
+      }
 
       // Step 1: Update password
-      const { error: passwordError } = await supabase.auth.updateUser({
-        password: password,
-      });
+      // Note: For invite links, users need to set password on first login
+      console.log("Calling updateUser...");
+      const updateStartTime = Date.now();
+      
+      try {
+        // Create a timeout promise
+        let timeoutId: NodeJS.Timeout;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error("Password update timed out after 15 seconds"));
+          }, 15000);
+        });
 
-      if (passwordError) {
-        console.error("Password update error:", passwordError);
+        // Race between update and timeout
+        const updatePromise = supabase.auth.updateUser({
+          password: password,
+        });
+
+        const result = await Promise.race([updatePromise, timeoutPromise]);
+        
+        // Clear timeout if update succeeded
+        clearTimeout(timeoutId!);
+
+        const updateDuration = Date.now() - updateStartTime;
+        console.log(`Password update completed in ${updateDuration}ms`);
+
+        const { error: passwordError, data: passwordData } = result;
+
+        if (passwordError) {
+          console.error("Password update error:", passwordError);
+          console.error("Error code:", passwordError.status || passwordError.code);
+          console.error("Error message:", passwordError.message);
+          setErrors({
+            general: passwordError.message || "Failed to update password. Please try again.",
+          });
+          setLoading(false);
+          return;
+        }
+
+        console.log("Password updated successfully", passwordData);
+      } catch (updateError) {
+        console.error("Exception during password update:", updateError);
+        const errorMessage =
+          updateError instanceof Error ? updateError.message : "Unknown error";
         setErrors({
-          general: passwordError.message || "Failed to update password. Please try again.",
+          general: `Password update failed: ${errorMessage}. Please refresh and try again.`,
         });
         setLoading(false);
         return;
       }
-
-      console.log("Password updated successfully");
 
       // Step 2: Insert or update profile with onboarding_complete = true
       const profileData = {
