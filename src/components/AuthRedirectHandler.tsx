@@ -24,8 +24,8 @@ export function AuthRedirectHandler() {
   const hasRedirected = useRef(false); // Prevent multiple redirects for same auth event
   const isNavigating = useRef(false); // Track if navigation is in progress
   const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const previousPathRef = useRef<string | null>(null); // Track previous path
   const previousUserRef = useRef<string | null>(null); // Track previous user ID
+  const isInitialAuthEvent = useRef(false); // Track if this is a new sign-in event
 
   useEffect(() => {
     // Cleanup any pending redirects
@@ -37,87 +37,117 @@ export function AuthRedirectHandler() {
     const currentPath = routerState.location.pathname;
     const currentUserId = user?.id || null;
     
-    // Reset redirect flag when:
-    // 1. User changes (new sign-in event, like from invite link)
-    // 2. Path changes (user navigated manually)
-    if (previousUserRef.current !== currentUserId) {
-      hasRedirected.current = false; // New user or new sign-in event
+    // Detect new sign-in events (like invite links or login)
+    // This happens when user ID changes from null to a value, or changes to a different user
+    const isNewSignIn = previousUserRef.current !== currentUserId && currentUserId !== null;
+    
+    if (isNewSignIn) {
+      // New sign-in event detected - this is likely from invite link or login
+      hasRedirected.current = false; // Reset redirect flag for new auth event
+      isInitialAuthEvent.current = true; // Mark as initial auth event
       previousUserRef.current = currentUserId;
+    } else if (previousUserRef.current === currentUserId && currentUserId !== null) {
+      // Same user, not a new sign-in - this is manual navigation
+      isInitialAuthEvent.current = false; // Not an initial auth event
     }
     
-    if (previousPathRef.current !== null && previousPathRef.current !== currentPath) {
-      // Only reset if user manually navigated (not from our redirect)
-      // We can detect this by checking if we're not in the middle of navigating
-      if (!isNavigating.current) {
-        hasRedirected.current = false; // User navigated manually, allow navigation
-      }
-    }
-    previousPathRef.current = currentPath;
-
-    // Don't redirect while loading, if no user, or if navigation is already in progress
-    if (loading || !user || isNavigating.current) {
-      if (!user) {
-        hasRedirected.current = false; // Reset when user logs out
-        previousUserRef.current = null;
-      }
+    if (!user) {
+      // User logged out - reset everything
+      hasRedirected.current = false;
+      previousUserRef.current = null;
+      isInitialAuthEvent.current = false;
       return;
     }
 
-    // Prevent multiple redirects for the same auth event
-    // But allow new sign-in events (like invite links) to trigger redirects
-    if (hasRedirected.current) {
+    // Don't redirect while loading or if navigation is already in progress
+    if (loading || isNavigating.current) {
       return;
     }
 
-    // Handle redirects for authenticated users based on onboarding status
-    // This handles:
-    // 1. Invite/magic links that land on any page (especially / or /login)
-    // 2. Normal login flows
-    // 
-    // We only redirect if:
-    // - User is on a public route (/, /login, /contact, /request-access)
-    // - Onboarding status is determined (not null)
-    // - We haven't already redirected for this auth event
-    const publicRoutes = ["/", "/login", "/contact", "/request-access"];
-    
-    if (publicRoutes.includes(currentPath)) {
-      // Only redirect if onboarding status is determined (not null)
-      // Use a timeout to let auth state settle and Supabase process hash from invite links
-      // For invite links, Supabase needs time to:
-      // 1. Process the hash (#access_token=...)
-      // 2. Fire SIGNED_IN event
-      // 3. Check onboarding status from profiles table
+    // Don't interfere with form submission pages or protected routes
+    // These pages handle their own redirects after form submission
+    const formPages = ["/set-password", "/reset-password"];
+    if (formPages.includes(currentPath)) {
+      return;
+    }
+
+    // Only redirect on initial auth events (invite links, login), not on manual navigation
+    // This prevents redirecting users away from pages they manually navigated to
+    if (!isInitialAuthEvent.current || hasRedirected.current) {
+      return;
+    }
+
+    // Only redirect from /login on initial auth events
+    // Allow authenticated users to freely navigate to home page and other public routes
+    // This prevents the "flash and redirect" issue when clicking the logo
+    if (currentPath === "/login") {
       redirectTimeoutRef.current = setTimeout(() => {
         // Double-check conditions haven't changed
-        if (isNavigating.current || hasRedirected.current || !user) {
+        if (isNavigating.current || hasRedirected.current || !user || !isInitialAuthEvent.current) {
           return;
         }
 
-        // If onboarding status is still null, assume incomplete (new user from invite link)
-        // This is safe because new users from invite links won't have a profile yet
+        // If onboarding status is null or false, redirect to set-password
         if (onboardingComplete === null || onboardingComplete === false) {
-          // User needs to complete onboarding (invite link flow)
           hasRedirected.current = true;
           isNavigating.current = true;
           navigate({ to: "/set-password", replace: true })
             .catch(() => {
-              // Ignore navigation errors (e.g., if user navigates away)
+              // Ignore navigation errors
             })
             .finally(() => {
               isNavigating.current = false;
+              isInitialAuthEvent.current = false; // Reset after redirect
             });
         } else if (onboardingComplete === true) {
           hasRedirected.current = true;
           isNavigating.current = true;
           navigate({ to: "/app", replace: true })
             .catch(() => {
-              // Ignore navigation errors (e.g., if user navigates away)
+              // Ignore navigation errors
             })
             .finally(() => {
               isNavigating.current = false;
+              isInitialAuthEvent.current = false; // Reset after redirect
             });
         }
-      }, 500); // Delay to let auth state settle and Supabase process hash
+      }, 300); // Small delay to let auth state settle
+
+      return () => {
+        if (redirectTimeoutRef.current) {
+          clearTimeout(redirectTimeoutRef.current);
+          redirectTimeoutRef.current = null;
+        }
+      };
+    }
+    
+    // For invite links that land on home page (/), also redirect once
+    // But only on initial auth events, not manual navigation
+    if (currentPath === "/" && isInitialAuthEvent.current && !hasRedirected.current) {
+      redirectTimeoutRef.current = setTimeout(() => {
+        if (isNavigating.current || hasRedirected.current || !user || !isInitialAuthEvent.current) {
+          return;
+        }
+
+        // If onboarding status is null or false, redirect to set-password (invite link flow)
+        if (onboardingComplete === null || onboardingComplete === false) {
+          hasRedirected.current = true;
+          isNavigating.current = true;
+          navigate({ to: "/set-password", replace: true })
+            .catch(() => {
+              // Ignore navigation errors
+            })
+            .finally(() => {
+              isNavigating.current = false;
+              isInitialAuthEvent.current = false; // Reset after redirect
+            });
+        } else if (onboardingComplete === true) {
+          // If onboarding is complete, don't redirect from home page
+          // Allow users to view the home page even when authenticated
+          hasRedirected.current = true; // Mark as handled
+          isInitialAuthEvent.current = false; // Reset
+        }
+      }, 500); // Longer delay for home page to allow Supabase to process hash
 
       return () => {
         if (redirectTimeoutRef.current) {

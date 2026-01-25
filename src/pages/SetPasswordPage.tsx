@@ -24,6 +24,7 @@ export default function SetPasswordPage() {
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [profileCreated, setProfileCreated] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState(3);
 
   // Check if user is authenticated on mount
   useEffect(() => {
@@ -306,9 +307,21 @@ export default function SetPasswordPage() {
       // Update auth context onboarding status
       await checkOnboardingStatus();
 
-      // Show success message - profile created, check email for password reset
+      // Show success message with countdown, then redirect to login
       setProfileCreated(true);
       setLoading(false);
+      
+      // Start countdown and redirect
+      let countdown = 3;
+      setRedirectCountdown(countdown);
+      const countdownInterval = setInterval(() => {
+        countdown--;
+        setRedirectCountdown(countdown);
+        if (countdown <= 0) {
+          clearInterval(countdownInterval);
+          window.location.href = "/login";
+        }
+      }, 1000);
     } catch (err) {
       console.error("Unexpected error in form submission:", err);
       setErrors({
@@ -364,12 +377,17 @@ export default function SetPasswordPage() {
               <p className="text-sm text-text/60">
                 Please check your inbox and click the link to set your password. Once you've set your password, you'll be able to sign in.
               </p>
+              {redirectCountdown > 0 && (
+                <p className="mt-2 text-sm text-text/50">
+                  Redirecting to sign in in {redirectCountdown} second{redirectCountdown !== 1 ? 's' : ''}...
+                </p>
+              )}
             </div>
             <button
               onClick={() => window.location.href = "/login"}
               className="w-full rounded-lg border-2 border-accent/60 bg-surface/80 px-6 py-3 text-base font-semibold text-accent shadow-glow transition-all duration-300 hover:-translate-y-0.5 hover:border-accent hover:bg-accent/10 hover:shadow-glow-lg"
             >
-              Go to Sign In
+              Go to Sign In Now
             </button>
           </div>
         ) : (
