@@ -71,7 +71,7 @@ export default function LoginPage() {
       // If check fails, default to /dashboard (route guard will handle it)
       setLoading(false);
       requestAnimationFrame(() => {
-        navigate({ to: "/dashboard", replace: true });
+        navigate({ to: "/dashboard", search: {}, replace: true });
       });
     }
   };

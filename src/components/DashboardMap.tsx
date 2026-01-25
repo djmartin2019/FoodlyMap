@@ -15,6 +15,8 @@ interface DashboardMapProps {
   onMapCenterChange?: (lng: number, lat: number) => void;
   places?: Place[];
   hideTempMarker?: boolean; // Hide temporary marker when form is shown
+  highlightedLocationId?: string | null; // ID of location to highlight
+  centerOnLocation?: { lat: number; lng: number }; // Coordinates to center map on
 }
 
 /**
@@ -35,7 +37,14 @@ interface DashboardMapProps {
  *    trigger multiple map initializations
  * 3. Multiple map instances cause performance issues and memory leaks
  */
-export default function DashboardMap({ mode, onMapCenterChange, places = [], hideTempMarker = false }: DashboardMapProps) {
+export default function DashboardMap({ 
+  mode, 
+  onMapCenterChange, 
+  places = [], 
+  hideTempMarker = false,
+  highlightedLocationId = null,
+  centerOnLocation,
+}: DashboardMapProps) {
   // Ref to the container div - React will attach this to the DOM element
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   // Ref to the map instance - prevents re-initialization on re-renders
@@ -47,6 +56,8 @@ export default function DashboardMap({ mode, onMapCenterChange, places = [], hid
   const placeMarkersRef = useRef<mapboxgl.Marker[]>([]);
   // Ref to existing place popups
   const placePopupsRef = useRef<mapboxgl.Popup[]>([]);
+  // Ref to highlighted marker (for view-on-map feature)
+  const highlightedMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
   // Initialize map exactly once
   useEffect(() => {
@@ -83,6 +94,8 @@ export default function DashboardMap({ mode, onMapCenterChange, places = [], hid
       placePopupsRef.current = [];
       tempMarkerRef.current?.remove();
       tempMarkerRef.current = null;
+      highlightedMarkerRef.current?.remove();
+      highlightedMarkerRef.current = null;
       
       if (mapRef.current) {
         mapRef.current.remove();
@@ -193,26 +206,37 @@ export default function DashboardMap({ mode, onMapCenterChange, places = [], hid
 
       // Create markers for each place
       places.forEach((place) => {
-        // Create marker element
+        const isHighlighted = highlightedLocationId === place.id;
+        
+        // Create marker element with enhanced styling if highlighted
         const el = document.createElement("div");
         el.className = "place-marker";
-        el.style.width = "12px";
-        el.style.height = "12px";
-        el.style.borderRadius = "50%";
-        el.style.backgroundColor = "#39FF88";
-        el.style.border = "2px solid rgba(57, 255, 136, 0.6)";
-        el.style.boxShadow = "0 0 8px rgba(57, 255, 136, 0.5)";
+        if (isHighlighted) {
+          el.style.width = "18px";
+          el.style.height = "18px";
+          el.style.borderRadius = "50%";
+          el.style.backgroundColor = "#39FF88";
+          el.style.border = "3px solid rgba(57, 255, 136, 1)";
+          el.style.boxShadow = "0 0 16px rgba(57, 255, 136, 0.8)";
+        } else {
+          el.style.width = "12px";
+          el.style.height = "12px";
+          el.style.borderRadius = "50%";
+          el.style.backgroundColor = "#39FF88";
+          el.style.border = "2px solid rgba(57, 255, 136, 0.6)";
+          el.style.boxShadow = "0 0 8px rgba(57, 255, 136, 0.5)";
+        }
         el.style.cursor = "pointer";
         el.style.pointerEvents = "auto";
         el.style.position = "relative";
-        el.style.zIndex = "1000";
+        el.style.zIndex = isHighlighted ? "2000" : "1000";
 
         // Create popup with proper styling
         const popup = new mapboxgl.Popup({
           closeButton: false,
           closeOnClick: true,
           className: "place-popup",
-          offset: 25, // Offset popup above marker
+          offset: isHighlighted ? 30 : 25, // Offset popup above marker
         })
           .setHTML(`<div class="text-sm font-semibold text-text">${place.name}</div>`);
 
@@ -223,11 +247,29 @@ export default function DashboardMap({ mode, onMapCenterChange, places = [], hid
           .setPopup(popup) // Attach popup to marker
           .addTo(map);
 
+        if (isHighlighted) {
+          highlightedMarkerRef.current = marker;
+          // Open popup for highlighted location
+          popup.addTo(map);
+        }
+
         placeMarkersRef.current.push(marker);
         placePopupsRef.current.push(popup);
       });
     }
-  }, [places, mode]);
+  }, [places, mode, highlightedLocationId]);
+
+  // Handle centering map on location from URL params
+  useEffect(() => {
+    if (!mapRef.current || !centerOnLocation) return;
+
+    const map = mapRef.current;
+    map.flyTo({
+      center: [centerOnLocation.lng, centerOnLocation.lat],
+      zoom: 14,
+      duration: 1000,
+    });
+  }, [centerOnLocation]);
 
   return (
     <div className="relative h-full w-full">

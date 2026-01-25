@@ -151,6 +151,7 @@ const setPasswordRoute = createRoute({
             if (isComplete === true) {
               throw redirect({
                 to: "/dashboard",
+                search: {},
               });
             }
           }
@@ -202,6 +203,17 @@ const userDashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/dashboard",
   component: UserDashboardPage,
+  validateSearch: (search: Record<string, unknown>): {
+    locationId?: string;
+    lat?: number;
+    lng?: number;
+  } => {
+    return {
+      locationId: (search.locationId as string) || undefined,
+      lat: search.lat ? Number(search.lat) : undefined,
+      lng: search.lng ? Number(search.lng) : undefined,
+    };
+  },
   beforeLoad: async () => {
     // Check authentication before allowing access
     // Auth is already resolved (router is gated), so this check is fast
@@ -305,6 +317,7 @@ function RootLayout() {
               <>
                 <Link
                   to="/dashboard"
+                  search={{}}
                   className="text-sm text-text/70 transition-colors hover:text-accent"
                 >
                   Dashboard

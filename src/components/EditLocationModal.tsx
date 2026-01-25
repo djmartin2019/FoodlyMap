@@ -1,4 +1,5 @@
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, useEffect } from "react";
+import { Location } from "./LocationsTable";
 import CategorySelect from "./CategorySelect";
 
 interface Category {
@@ -6,38 +7,47 @@ interface Category {
   name: string;
 }
 
-interface PlaceNameFormProps {
-  onSubmit: (name: string, categoryId: string | null) => void;
+interface EditLocationModalProps {
+  location: Location;
+  categories: Category[];
+  onSave: (locationId: string, name: string, categoryId: string | null) => Promise<void>;
   onCancel: () => void;
   loading?: boolean;
-  categories: Category[];
   onCategoryCreated?: (category: Category) => void;
 }
 
 /**
- * PlaceNameForm Component
+ * EditLocationModal Component
  * 
- * Simple form for naming a new place.
- * Used after user clicks "Place Here" in ADD_PLACE mode.
+ * Modal form for editing a location's name and category.
+ * Pre-fills with current location data.
  */
-export default function PlaceNameForm({ 
-  onSubmit, 
-  onCancel, 
-  loading = false,
+export default function EditLocationModal({
+  location,
   categories,
+  onSave,
+  onCancel,
+  loading = false,
   onCategoryCreated,
-}: PlaceNameFormProps) {
-  const [name, setName] = useState("");
-  const [categoryId, setCategoryId] = useState<string | null>(null);
+}: EditLocationModalProps) {
+  const [name, setName] = useState(location.name);
+  const [categoryId, setCategoryId] = useState<string | null>(location.category_id || null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  // Update form when location changes
+  useEffect(() => {
+    setName(location.name);
+    setCategoryId(location.category_id || null);
+    setError(null);
+  }, [location]);
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
 
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setError("Please enter a name for this place");
+      setError("Location name is required");
       return;
     }
 
@@ -46,21 +56,24 @@ export default function PlaceNameForm({
       return;
     }
 
-    onSubmit(trimmedName, categoryId);
+    try {
+      await onSave(location.id, trimmedName, categoryId);
+    } catch (err) {
+      setError("Failed to update location. Please try again.");
+    }
   };
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-bg/95 backdrop-blur-sm p-4">
-      {/* Mobile: Full-width with padding, Desktop: Max-width centered */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/95 backdrop-blur-sm p-4">
       <div className="w-full max-w-md rounded-2xl border border-surface/60 bg-surface/30 p-6 shadow-neon-md sm:p-8">
-        <h3 className="mb-4 text-xl font-semibold text-accent sm:text-2xl">Name This Place</h3>
+        <h3 className="mb-4 text-xl font-semibold text-accent sm:text-2xl">Edit Location</h3>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <label htmlFor="place-name" className="mb-2 block text-sm font-medium text-text/70">
-              Place Name
+            <label htmlFor="edit-location-name" className="mb-2 block text-sm font-medium text-text/70">
+              Location Name
             </label>
             <input
-              id="place-name"
+              id="edit-location-name"
               type="text"
               value={name}
               onChange={(e) => {
@@ -73,13 +86,10 @@ export default function PlaceNameForm({
               disabled={loading}
               maxLength={100}
             />
-            {error && (
-              <p className="mt-2 text-sm text-red-400">{error}</p>
-            )}
           </div>
 
           <div className="mb-4">
-            <label htmlFor="place-category" className="mb-2 block text-sm font-medium text-text/70">
+            <label htmlFor="edit-location-category" className="mb-2 block text-sm font-medium text-text/70">
               Category
             </label>
             <CategorySelect
@@ -90,6 +100,12 @@ export default function PlaceNameForm({
               disabled={loading}
             />
           </div>
+
+          {error && (
+            <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+              {error}
+            </div>
+          )}
 
           <div className="flex gap-3">
             <button
@@ -105,7 +121,7 @@ export default function PlaceNameForm({
               disabled={loading || !name.trim()}
               className="flex-1 rounded-lg border border-accent/60 bg-accent/15 px-4 py-3 text-base font-medium text-accent transition-colors active:bg-accent/20 disabled:opacity-50 sm:py-2 sm:text-sm hover:border-accent hover:bg-accent/20"
             >
-              {loading ? "Saving..." : "Save Place"}
+              {loading ? "Saving..." : "Save Changes"}
             </button>
           </div>
         </form>
