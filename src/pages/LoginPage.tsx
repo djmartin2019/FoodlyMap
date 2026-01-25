@@ -31,9 +31,11 @@ export default function LoginPage() {
       return;
     }
 
-    // Success: redirect to protected route
-    // The auth context will update, and route protection will allow access
-    navigate({ to: "/app" });
+    // Success: Don't navigate manually - let AuthRedirectHandler handle it
+    // This prevents race conditions and multiple redirects
+    // The auth context will update via onAuthStateChange, which triggers
+    // AuthRedirectHandler to redirect based on onboarding status
+    setLoading(false);
   };
 
   // Handle forgot password form submission

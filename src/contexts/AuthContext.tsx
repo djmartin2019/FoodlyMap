@@ -76,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session) => {
+      // Update session and user state immediately
       setSession(session);
       setUser(session?.user ?? null);
 
@@ -90,7 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // The recovery link's redirect_to already sends user to /reset-password
         // Supabase is still processing the hash, so we must not interrupt
         console.log("PASSWORD_RECOVERY event detected - session established");
-        // Don't redirect - let the page that Supabase redirected to handle it
+        setLoading(false);
+        return; // Don't check onboarding for recovery sessions
       }
 
       // Handle SIGNED_IN event (invite links, magic links, normal login)
@@ -99,18 +101,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Check onboarding status from profiles table
         const isComplete = await checkOnboardingStatus(session.user.id);
         setOnboardingComplete(isComplete);
+        setLoading(false);
         // Navigation is handled by AuthRedirectHandler component based on onboarding status
       } else if (event === "SIGNED_OUT") {
         setOnboardingComplete(null);
+        setLoading(false);
       } else if (session?.user) {
         // For other events (like TOKEN_REFRESHED), update status but don't redirect
         const isComplete = await checkOnboardingStatus(session.user.id);
         setOnboardingComplete(isComplete);
+        setLoading(false);
       } else {
         setOnboardingComplete(null);
+        setLoading(false);
       }
-
-      setLoading(false);
     });
 
     // Cleanup subscription on unmount
