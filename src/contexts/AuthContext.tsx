@@ -64,16 +64,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     // Global auth state listener
-    // This is required for invite links and magic links to work correctly.
+    // This is required for invite links, magic links, and password recovery to work correctly.
     // When a user clicks an invite link (e.g., https://foodlymap.com/#access_token=...),
     // Supabase processes the hash and fires a SIGNED_IN event. We listen for this
     // event to check onboarding status and trigger redirects via AuthRedirectHandler.
-    // We focus on SIGNED_IN events specifically to handle post-authentication routing.
+    // 
+    // IMPORTANT: PASSWORD_RECOVERY events must be handled explicitly.
+    // When a user clicks a password reset link, Supabase authenticates them and emits
+    // a PASSWORD_RECOVERY event. We must redirect to /reset-password immediately.
+    // Do NOT parse window.location.hash manually - Supabase handles this internally.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+
+      // Handle PASSWORD_RECOVERY event - redirect to reset password page
+      // This event fires when user clicks password reset link from email
+      // The session is a temporary recovery session that allows password update
+      if (event === "PASSWORD_RECOVERY" && session?.user) {
+        // Redirect to reset password page
+        // Use window.location for hard redirect to ensure clean state
+        window.location.href = "/reset-password";
+        return; // Don't continue processing - redirect is happening
+      }
 
       // Handle SIGNED_IN event (invite links, magic links, normal login)
       // This is the key event that fires when Supabase processes URL hash tokens

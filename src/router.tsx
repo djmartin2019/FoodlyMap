@@ -13,6 +13,7 @@ import LoginPage from "./pages/LoginPage";
 import AppPage from "./pages/AppPage";
 import RequestAccessPage from "./pages/RequestAccessPage";
 import SetPasswordPage from "./pages/SetPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { useAuth } from "./contexts/AuthContext";
 import { AuthRedirectHandler } from "./components/AuthRedirectHandler";
 
@@ -163,6 +164,49 @@ const setPasswordRoute = createRoute({
   },
 });
 
+// Reset password route (requires active recovery session)
+// This route is accessed when user clicks password reset link from email
+// The PASSWORD_RECOVERY event creates a temporary session that allows password update
+const resetPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/reset-password",
+  component: ResetPasswordPage,
+  beforeLoad: async () => {
+    try {
+      // Check for active session (required for password reset)
+      // PASSWORD_RECOVERY events create a temporary session
+      const { supabase } = await import("./lib/supabase");
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      // If no session, redirect to login
+      // This means the recovery link is invalid or expired
+      if (sessionError || !session) {
+        throw redirect({
+          to: "/login",
+        });
+      }
+
+      // Session exists - allow access to reset password page
+      // Component will handle the actual password update
+    } catch (error) {
+      // If redirect was thrown, re-throw it
+      if (error && typeof error === "object" && "to" in error) {
+        throw error;
+      }
+      // Ignore AbortError - it happens when navigation is cancelled
+      if (error instanceof Error && error.name === "AbortError") {
+        return; // Allow page to load
+      }
+      // Log other errors but don't crash
+      console.error("Error in reset-password route guard:", error);
+      return; // Allow page to load - component will handle session check
+    }
+  },
+});
+
 // Protected route (requires authentication)
 const appRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -190,6 +234,7 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   requestAccessRoute,
   setPasswordRoute,
+  resetPasswordRoute,
   appRoute,
 ]);
 
