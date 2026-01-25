@@ -206,19 +206,113 @@ export default function SetPasswordPage() {
 
       console.log("Creating profile:", profileData);
 
-      const { data: profileDataResult, error: profileError } = await supabase
-        .from("profiles")
-        .upsert(profileData, {
-          onConflict: "id",
-        })
-        .select()
-        .single();
+      // Retry logic for profile creation (AbortError can happen due to network/RLS issues)
+      let profileDataResult;
+      let profileError;
+      let retries = 0;
+      const maxRetries = 3;
+
+      while (retries < maxRetries) {
+        try {
+          console.log(`Attempting profile creation (attempt ${retries + 1}/${maxRetries})...`);
+          
+          // Try INSERT first (for new profiles), then UPDATE if it fails due to conflict
+          // This avoids RLS issues with upsert SELECT checks
+          let result;
+          
+          // First attempt: try INSERT without SELECT to avoid RLS issues
+          result = await supabase
+            .from("profiles")
+            .insert(profileData);
+          
+          // If insert fails due to conflict, try update
+          if (result.error && (result.error.code === "23505" || result.error.message?.includes("duplicate"))) {
+            console.log("Profile exists, trying UPDATE instead...");
+            result = await supabase
+              .from("profiles")
+              .update({
+                username: profileData.username,
+                first_name: profileData.first_name,
+                last_name: profileData.last_name,
+                phone: profileData.phone,
+                onboarding_complete: profileData.onboarding_complete,
+              })
+              .eq("id", profileData.id);
+          }
+
+          profileError = result.error;
+
+          // If no error, verify by reading back the profile
+          if (!profileError) {
+            console.log("Profile write succeeded, verifying...");
+            // Verify by reading the profile back
+            const verifyResult = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", profileData.id)
+              .single();
+            
+            if (verifyResult.error) {
+              console.warn("Profile write succeeded but verification failed:", verifyResult.error);
+              // This is OK - the write might have succeeded even if we can't read it back
+              profileDataResult = profileData; // Use the data we sent
+            } else {
+              profileDataResult = verifyResult.data;
+              console.log("Profile creation and verification succeeded!");
+            }
+            break;
+          }
+
+          // Check if it's an AbortError
+          const isAbortError =
+            profileError.message?.includes("AbortError") ||
+            profileError.code === "ABORTED" ||
+            profileError.message?.includes("aborted");
+
+          if (isAbortError) {
+            retries++;
+            console.warn(`Profile creation aborted, retrying (${retries}/${maxRetries})...`);
+            // Wait a bit before retrying (exponential backoff)
+            await new Promise((resolve) => setTimeout(resolve, 1000 * retries));
+            continue;
+          }
+
+          // For other errors, break and handle below
+          break;
+        } catch (err) {
+          // If it's an AbortError in the catch, retry
+          const isAbortError =
+            err instanceof Error &&
+            (err.message.includes("AbortError") || err.message.includes("aborted"));
+
+          if (isAbortError) {
+            retries++;
+            console.warn(`Profile creation exception, retrying (${retries}/${maxRetries})...`);
+            await new Promise((resolve) => setTimeout(resolve, 1000 * retries));
+            continue;
+          }
+          // For other exceptions, break
+          profileError = err as any;
+          break;
+        }
+      }
 
       if (profileError) {
-        console.error("Profile creation error:", profileError);
+        console.error("Profile creation error after retries:", profileError);
         // Handle unique constraint violation
-        if (profileError.code === "23505" || profileError.message.includes("duplicate")) {
+        if (
+          profileError.code === "23505" ||
+          profileError.message?.includes("duplicate") ||
+          profileError.message?.includes("unique")
+        ) {
           setErrors({ username: "This username is already taken. Please choose another." });
+        } else if (profileError.message?.includes("AbortError")) {
+          // If still aborting after retries, show a message but try to continue
+          console.error("Profile creation still failing after retries - this may be a network issue");
+          setErrors({
+            general:
+              "Network error while saving profile. Please refresh and try again, or contact support if the issue persists.",
+          });
         } else {
           setErrors({
             general: `Failed to save profile: ${profileError.message || "Please try again."}`,
