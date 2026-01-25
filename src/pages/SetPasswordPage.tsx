@@ -206,14 +206,25 @@ export default function SetPasswordPage() {
       // Step 2: Create profile with timeout
       console.log("Creating profile (with 5 second timeout)...");
       
-      const profileInsertPromise = supabase
-        .from("profiles")
-        .insert(profileData)
-        .then((result) => ({ success: true, ...result }))
-        .catch((err) => ({ success: false, error: err }));
+      // Wrap the Supabase call in a proper Promise
+      const profileInsertPromise = new Promise<{ success: boolean; error?: any }>(async (resolve) => {
+        try {
+          const result = await supabase
+            .from("profiles")
+            .insert(profileData);
+          
+          if (result.error) {
+            resolve({ success: false, error: result.error });
+          } else {
+            resolve({ success: true });
+          }
+        } catch (err: any) {
+          resolve({ success: false, error: err });
+        }
+      });
 
       // Race profile creation against a timeout
-      const profileTimeoutPromise = new Promise((resolve) => {
+      const profileTimeoutPromise = new Promise<{ timeout: boolean }>((resolve) => {
         setTimeout(() => resolve({ timeout: true }), 5000); // 5 second timeout
       });
 
@@ -228,12 +239,10 @@ export default function SetPasswordPage() {
           setLoading(false);
           return;
         }
-        if (result.success && result.error) {
-          profileError = result.error;
-        } else if (!result.success) {
+        if (!result.success && result.error) {
           profileError = result.error;
         }
-        // If result.success is true and no error, profile was created successfully
+        // If result.success is true, profile was created successfully
       } catch (err: any) {
         console.error("Profile creation exception:", err);
         profileError = err;
