@@ -157,15 +157,9 @@ export default function SetPasswordPage() {
       console.log("User email:", currentUser.email);
       console.log("User created at:", currentUser.created_at);
 
-      // Refresh session before password update to ensure we have a valid session
-      console.log("Refreshing session...");
-      const { error: sessionError } = await supabase.auth.refreshSession();
-      if (sessionError) {
-        console.error("Session refresh error:", sessionError);
-        // Continue anyway - the session might still be valid
-      } else {
-        console.log("Session refreshed successfully");
-      }
+      // Skip session refresh for invite links - session is already valid
+      // refreshSession() can hang in some cases, so we'll proceed without it
+      console.log("Skipping session refresh (session should already be valid for invite links)");
 
       // Step 1: Update password
       // Note: For invite links, users need to set password on first login
