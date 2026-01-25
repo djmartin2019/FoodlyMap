@@ -47,26 +47,35 @@ const loginRoute = createRoute({
   path: "/login",
   component: LoginPage,
   beforeLoad: async () => {
-    // Check if user is already authenticated
-    const { supabase } = await import("./lib/supabase");
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    try {
+      // Check if user is already authenticated
+      const { supabase } = await import("./lib/supabase");
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-    if (session?.user) {
-      // Check onboarding status
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarding_complete")
-        .eq("id", session.user.id)
-        .single();
+      if (session?.user) {
+        // Check onboarding status
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("onboarding_complete")
+          .eq("id", session.user.id)
+          .single();
 
-      const isComplete = profile?.onboarding_complete ?? false;
+        const isComplete = profile?.onboarding_complete ?? false;
 
-      // Redirect based on onboarding status
-      throw redirect({
-        to: isComplete ? "/app" : "/set-password",
-      });
+        // Redirect based on onboarding status
+        throw redirect({
+          to: isComplete ? "/app" : "/set-password",
+        });
+      }
+    } catch (error) {
+      // If redirect was thrown, re-throw it
+      if (error && typeof error === "object" && "to" in error) {
+        throw error;
+      }
+      // Otherwise, ignore errors (allow page to load normally)
+      console.error("Error in login route guard:", error);
     }
   },
 });
@@ -77,35 +86,46 @@ const setPasswordRoute = createRoute({
   path: "/set-password",
   component: SetPasswordPage,
   beforeLoad: async () => {
-    // Check authentication before allowing access
-    const { supabase } = await import("./lib/supabase");
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    try {
+      // Check authentication before allowing access
+      const { supabase } = await import("./lib/supabase");
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-    // If no session, redirect to login
-    if (!session) {
+      // If no session, redirect to login
+      if (!session) {
+        throw redirect({
+          to: "/login",
+        });
+      }
+
+      // If onboarding is already complete, redirect to app
+      // This prevents users from revisiting the onboarding page
+      if (session.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("onboarding_complete")
+          .eq("id", session.user.id)
+          .single();
+
+        const isComplete = profile?.onboarding_complete ?? false;
+
+        if (isComplete) {
+          throw redirect({
+            to: "/app",
+          });
+        }
+      }
+    } catch (error) {
+      // If redirect was thrown, re-throw it
+      if (error && typeof error === "object" && "to" in error) {
+        throw error;
+      }
+      // Otherwise, redirect to login on error
       throw redirect({
         to: "/login",
       });
-    }
-
-    // If onboarding is already complete, redirect to app
-    // This prevents users from revisiting the onboarding page
-    if (session.user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarding_complete")
-        .eq("id", session.user.id)
-        .single();
-
-      const isComplete = profile?.onboarding_complete ?? false;
-
-      if (isComplete) {
-        throw redirect({
-          to: "/app",
-        });
-      }
     }
   },
 });

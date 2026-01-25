@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useAuth } from "../contexts/AuthContext";
 
 /**
@@ -20,12 +20,16 @@ import { useAuth } from "../contexts/AuthContext";
 export function AuthRedirectHandler() {
   const { user, onboardingComplete, loading } = useAuth();
   const navigate = useNavigate();
+  const routerState = useRouterState();
   const hasRedirected = useRef(false); // Prevent multiple redirects
+  const isNavigating = useRef(false); // Track if navigation is in progress
 
   useEffect(() => {
-    // Don't redirect while loading or if no user
-    if (loading || !user) {
-      hasRedirected.current = false;
+    // Don't redirect while loading, if no user, or if navigation is already in progress
+    if (loading || !user || isNavigating.current) {
+      if (!user) {
+        hasRedirected.current = false; // Reset when user logs out
+      }
       return;
     }
 
@@ -34,26 +38,44 @@ export function AuthRedirectHandler() {
       return;
     }
 
-    // Get current pathname to avoid redirect loops
-    const currentPath = window.location.pathname;
+    // Don't redirect if we're already on a protected route
+    const currentPath = routerState.location.pathname;
+    const protectedRoutes = ["/app", "/set-password"];
+    
+    if (protectedRoutes.includes(currentPath)) {
+      return; // Already on the right page
+    }
 
     // Only redirect if we're on a public route and user is authenticated
     // This handles invite/magic link flows where users land on / or /login
     const publicRoutes = ["/", "/login", "/contact", "/request-access"];
 
     if (publicRoutes.includes(currentPath)) {
-      // Redirect based on onboarding status
-      // Use replace: true to avoid back-button issues
-      if (onboardingComplete === true) {
-        hasRedirected.current = true;
-        navigate({ to: "/app", replace: true });
-      } else if (onboardingComplete === false) {
-        hasRedirected.current = true;
-        navigate({ to: "/set-password", replace: true });
-      }
-      // If onboardingComplete is null, wait for it to be determined
+      // Only redirect if onboarding status is determined (not null)
+      // Use a small timeout to avoid conflicts with manual navigation
+      const timeoutId = setTimeout(() => {
+        if (onboardingComplete === true && !isNavigating.current) {
+          hasRedirected.current = true;
+          isNavigating.current = true;
+          navigate({ to: "/app", replace: true }).catch(() => {
+            // Ignore navigation errors (e.g., if user navigates away)
+          }).finally(() => {
+            isNavigating.current = false;
+          });
+        } else if (onboardingComplete === false && !isNavigating.current) {
+          hasRedirected.current = true;
+          isNavigating.current = true;
+          navigate({ to: "/set-password", replace: true }).catch(() => {
+            // Ignore navigation errors (e.g., if user navigates away)
+          }).finally(() => {
+            isNavigating.current = false;
+          });
+        }
+      }, 100); // Small delay to avoid conflicts
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [user, onboardingComplete, loading, navigate]);
+  }, [user, onboardingComplete, loading, navigate, routerState.location.pathname]);
 
   // This component doesn't render anything
   return null;
