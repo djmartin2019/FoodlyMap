@@ -219,13 +219,16 @@ function RootLayout() {
   const handleSignOut = async () => {
     try {
       await signOut();
+      // Navigate immediately after sign out completes
+      // Use replace to avoid back-button issues
+      navigate({ to: "/login", replace: true });
     } catch (error: any) {
+      // Even if signOut fails, navigate to login
       // AbortError is common when navigation happens - ignore it
       if (error?.name !== "AbortError") {
         console.error("Error during sign out:", error);
       }
-    } finally {
-      // Always navigate, even if signOut fails or is aborted
+      // Still navigate even on error
       navigate({ to: "/login", replace: true });
     }
   };

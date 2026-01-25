@@ -23,16 +23,10 @@ export function AuthRedirectHandler() {
   const routerState = useRouterState();
   const hasRedirected = useRef(false); // Prevent multiple redirects for same auth event
   const isNavigating = useRef(false); // Track if navigation is in progress
-  const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const previousUserRef = useRef<string | null>(null); // Track previous user ID
   const isInitialAuthEvent = useRef(false); // Track if this is a new sign-in event
 
   useEffect(() => {
-    // Cleanup any pending redirects
-    if (redirectTimeoutRef.current) {
-      clearTimeout(redirectTimeoutRef.current);
-      redirectTimeoutRef.current = null;
-    }
 
     const currentPath = routerState.location.pathname;
     const currentUserId = user?.id || null;
@@ -81,80 +75,64 @@ export function AuthRedirectHandler() {
     // Allow authenticated users to freely navigate to home page and other public routes
     // This prevents the "flash and redirect" issue when clicking the logo
     if (currentPath === "/login") {
-      redirectTimeoutRef.current = setTimeout(() => {
-        // Double-check conditions haven't changed
-        if (isNavigating.current || hasRedirected.current || !user || !isInitialAuthEvent.current) {
-          return;
-        }
+      // Double-check conditions haven't changed
+      if (isNavigating.current || hasRedirected.current || !user || !isInitialAuthEvent.current) {
+        return;
+      }
 
-        // If onboarding status is null or false, redirect to set-password
-        if (onboardingComplete === null || onboardingComplete === false) {
-          hasRedirected.current = true;
-          isNavigating.current = true;
-          navigate({ to: "/set-password", replace: true })
-            .catch(() => {
-              // Ignore navigation errors
-            })
-            .finally(() => {
-              isNavigating.current = false;
-              isInitialAuthEvent.current = false; // Reset after redirect
-            });
-        } else if (onboardingComplete === true) {
-          hasRedirected.current = true;
-          isNavigating.current = true;
-          navigate({ to: "/app", replace: true })
-            .catch(() => {
-              // Ignore navigation errors
-            })
-            .finally(() => {
-              isNavigating.current = false;
-              isInitialAuthEvent.current = false; // Reset after redirect
-            });
-        }
-      }, 300); // Small delay to let auth state settle
-
-      return () => {
-        if (redirectTimeoutRef.current) {
-          clearTimeout(redirectTimeoutRef.current);
-          redirectTimeoutRef.current = null;
-        }
-      };
+      // If onboarding status is null or false, redirect to set-password
+      if (onboardingComplete === null || onboardingComplete === false) {
+        hasRedirected.current = true;
+        isNavigating.current = true;
+        navigate({ to: "/set-password", replace: true })
+          .catch(() => {
+            // Ignore navigation errors
+          })
+          .finally(() => {
+            isNavigating.current = false;
+            isInitialAuthEvent.current = false; // Reset after redirect
+          });
+      } else if (onboardingComplete === true) {
+        hasRedirected.current = true;
+        isNavigating.current = true;
+        navigate({ to: "/app", replace: true })
+          .catch(() => {
+            // Ignore navigation errors
+          })
+          .finally(() => {
+            isNavigating.current = false;
+            isInitialAuthEvent.current = false; // Reset after redirect
+          });
+      }
+      return;
     }
     
     // For invite links that land on home page (/), also redirect once
     // But only on initial auth events, not manual navigation
     if (currentPath === "/" && isInitialAuthEvent.current && !hasRedirected.current) {
-      redirectTimeoutRef.current = setTimeout(() => {
-        if (isNavigating.current || hasRedirected.current || !user || !isInitialAuthEvent.current) {
-          return;
-        }
+      if (isNavigating.current || hasRedirected.current || !user || !isInitialAuthEvent.current) {
+        return;
+      }
 
-        // If onboarding status is null or false, redirect to set-password (invite link flow)
-        if (onboardingComplete === null || onboardingComplete === false) {
-          hasRedirected.current = true;
-          isNavigating.current = true;
-          navigate({ to: "/set-password", replace: true })
-            .catch(() => {
-              // Ignore navigation errors
-            })
-            .finally(() => {
-              isNavigating.current = false;
-              isInitialAuthEvent.current = false; // Reset after redirect
-            });
-        } else if (onboardingComplete === true) {
-          // If onboarding is complete, don't redirect from home page
-          // Allow users to view the home page even when authenticated
-          hasRedirected.current = true; // Mark as handled
-          isInitialAuthEvent.current = false; // Reset
-        }
-      }, 500); // Longer delay for home page to allow Supabase to process hash
-
-      return () => {
-        if (redirectTimeoutRef.current) {
-          clearTimeout(redirectTimeoutRef.current);
-          redirectTimeoutRef.current = null;
-        }
-      };
+      // If onboarding status is null or false, redirect to set-password (invite link flow)
+      if (onboardingComplete === null || onboardingComplete === false) {
+        hasRedirected.current = true;
+        isNavigating.current = true;
+        navigate({ to: "/set-password", replace: true })
+          .catch(() => {
+            // Ignore navigation errors
+          })
+          .finally(() => {
+            isNavigating.current = false;
+            isInitialAuthEvent.current = false; // Reset after redirect
+          });
+      } else if (onboardingComplete === true) {
+        // If onboarding is complete, don't redirect from home page
+        // Allow users to view the home page even when authenticated
+        hasRedirected.current = true; // Mark as handled
+        isInitialAuthEvent.current = false; // Reset
+      }
+      return;
     }
   }, [user, onboardingComplete, loading, navigate, routerState.location.pathname]);
 

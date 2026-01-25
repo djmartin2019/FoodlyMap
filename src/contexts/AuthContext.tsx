@@ -185,45 +185,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Sign out function
-  // Clears session and all auth state, including stale recovery sessions
+  // Clears session and all auth state immediately for instant UI feedback
   const signOut = async () => {
+    // Clear state immediately for instant UI feedback
+    setUser(null);
+    setSession(null);
+    setOnboardingComplete(null);
+    
+    // Clear Supabase storage immediately
     try {
-      // Sign out from Supabase (with timeout to prevent hanging)
-      await Promise.race([
-        supabase.auth.signOut(),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Sign out timeout")), 3000)
-        )
-      ]);
-    } catch (error: any) {
-      // Log but don't block - we'll clear state anyway
-      // AbortError is common when navigation happens during signOut
-      if (error?.name !== "AbortError" && error?.message !== "Sign out timeout") {
-        console.error("Error signing out:", error);
-      }
-    } finally {
-      // Always clear state, even if signOut fails
-      // This ensures clean state even if Supabase signOut hangs
-      setUser(null);
-      setSession(null);
-      setOnboardingComplete(null);
-      
-      // Clear any stale Supabase storage to prevent recovery session conflicts
-      try {
-        // Clear Supabase's localStorage keys
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && (key.startsWith("sb-") || key.includes("supabase"))) {
-            keysToRemove.push(key);
-          }
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith("sb-") || key.includes("supabase"))) {
+          keysToRemove.push(key);
         }
-        keysToRemove.forEach(key => localStorage.removeItem(key));
-      } catch (storageError) {
-        // Ignore storage errors - not critical
-        console.warn("Error clearing storage:", storageError);
       }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+    } catch (storageError) {
+      // Ignore storage errors - not critical
+      console.warn("Error clearing storage:", storageError);
     }
+    
+    // Sign out from Supabase in background (non-blocking)
+    // Don't wait for it - state is already cleared for instant UI update
+    supabase.auth.signOut().catch((error: any) => {
+      // Log but don't block - state is already cleared
+      if (error?.name !== "AbortError") {
+        console.warn("Supabase sign out error (non-blocking):", error);
+      }
+    });
   };
 
   const value: AuthContextType = {
