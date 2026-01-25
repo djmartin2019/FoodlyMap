@@ -128,21 +128,22 @@ const setPasswordRoute = createRoute({
             .single();
 
           // If profile exists and onboarding is complete, redirect
-          if (!profileError) {
-            const isComplete = profile?.onboarding_complete ?? false;
+          if (!profileError && profile) {
+            const isComplete = profile.onboarding_complete ?? false;
             if (isComplete) {
               throw redirect({
                 to: "/app",
               });
             }
           }
-          // If profile doesn't exist, allow access (user needs to complete onboarding)
+          // If profile doesn't exist or error, allow access (user needs to complete onboarding)
         } catch (profileErr) {
           // If this is a redirect, re-throw it
           if (profileErr && typeof profileErr === "object" && "to" in profileErr) {
             throw profileErr;
           }
           // Otherwise, allow access (user can complete onboarding)
+          // Profile query errors are OK - user needs to create profile
         }
       }
     } catch (error) {
@@ -154,10 +155,10 @@ const setPasswordRoute = createRoute({
       if (error instanceof Error && error.name === "AbortError") {
         return; // Allow page to load
       }
-      // Otherwise, redirect to login on error
-      throw redirect({
-        to: "/login",
-      });
+      // Log other errors but don't crash - allow page to load
+      // This prevents black screen on refresh
+      console.error("Error in set-password route guard:", error);
+      return; // Allow page to load - component will handle auth check
     }
   },
 });

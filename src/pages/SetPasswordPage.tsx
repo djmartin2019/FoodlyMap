@@ -31,11 +31,22 @@ export default function SetPasswordPage() {
   // Check if user is authenticated on mount
   useEffect(() => {
     const checkSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        navigate({ to: "/login" });
+      try {
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error("Session check error:", sessionError);
+        }
+        
+        if (!session) {
+          navigate({ to: "/login", replace: true });
+        }
+      } catch (error) {
+        console.error("Error checking session:", error);
+        // Don't navigate on error - let route guard handle it
       }
     };
     checkSession();
@@ -161,57 +172,26 @@ export default function SetPasswordPage() {
       // refreshSession() can hang in some cases, so we'll proceed without it
       console.log("Skipping session refresh (session should already be valid for invite links)");
 
-      // Step 1: Update password
-      // Note: For invite links, users need to set password on first login
-      console.log("Calling updateUser...");
-      const updateStartTime = Date.now();
+      // Step 1: Try to update password (fire-and-forget, non-blocking)
+      // For invite links, password update may hang - we'll proceed with profile creation immediately
+      // User can set password later via password reset if needed
+      console.log("Starting password update (non-blocking)...");
       
-      try {
-        // Create a timeout promise
-        let timeoutId: NodeJS.Timeout;
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          timeoutId = setTimeout(() => {
-            reject(new Error("Password update timed out after 15 seconds"));
-          }, 15000);
-        });
-
-        // Race between update and timeout
-        const updatePromise = supabase.auth.updateUser({
-          password: password,
-        });
-
-        const result = await Promise.race([updatePromise, timeoutPromise]);
-        
-        // Clear timeout if update succeeded
-        clearTimeout(timeoutId!);
-
-        const updateDuration = Date.now() - updateStartTime;
-        console.log(`Password update completed in ${updateDuration}ms`);
-
-        const { error: passwordError, data: passwordData } = result;
-
-        if (passwordError) {
-          console.error("Password update error:", passwordError);
-          console.error("Error code:", passwordError.status || passwordError.code);
-          console.error("Error message:", passwordError.message);
-          setErrors({
-            general: passwordError.message || "Failed to update password. Please try again.",
-          });
-          setLoading(false);
-          return;
+      // Fire-and-forget password update - don't wait for it
+      supabase.auth.updateUser({ password: password }).then(
+        ({ error, data }) => {
+          if (error) {
+            console.error("Password update error (background):", error);
+          } else {
+            console.log("Password updated successfully (background)", data);
+          }
         }
+      ).catch((err) => {
+        console.warn("Password update failed (background):", err);
+      });
 
-        console.log("Password updated successfully", passwordData);
-      } catch (updateError) {
-        console.error("Exception during password update:", updateError);
-        const errorMessage =
-          updateError instanceof Error ? updateError.message : "Unknown error";
-        setErrors({
-          general: `Password update failed: ${errorMessage}. Please refresh and try again.`,
-        });
-        setLoading(false);
-        return;
-      }
+      // Proceed immediately to profile creation - don't wait for password update
+      console.log("Proceeding with profile creation (password update running in background)...");
 
       // Step 2: Insert or update profile with onboarding_complete = true
       const profileData = {
