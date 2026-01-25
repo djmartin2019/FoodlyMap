@@ -52,30 +52,46 @@ const loginRoute = createRoute({
       const { supabase } = await import("./lib/supabase");
       const {
         data: { session },
+        error: sessionError,
       } = await supabase.auth.getSession();
 
-      if (session?.user) {
-        // Check onboarding status
-        const { data: profile } = await supabase
+      // If there's an error or no session, allow page to load
+      if (sessionError || !session?.user) {
+        return;
+      }
+
+      // Check onboarding status with error handling
+      try {
+        const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("onboarding_complete")
           .eq("id", session.user.id)
           .single();
 
-        const isComplete = profile?.onboarding_complete ?? false;
+        // If profile doesn't exist or error, assume onboarding incomplete
+        const isComplete = profileError ? false : (profile?.onboarding_complete ?? false);
 
         // Redirect based on onboarding status
         throw redirect({
           to: isComplete ? "/app" : "/set-password",
         });
+      } catch (profileErr) {
+        // If this is a redirect, re-throw it
+        if (profileErr && typeof profileErr === "object" && "to" in profileErr) {
+          throw profileErr;
+        }
+        // Otherwise, allow page to load (user can still log in)
       }
     } catch (error) {
       // If redirect was thrown, re-throw it
       if (error && typeof error === "object" && "to" in error) {
         throw error;
       }
-      // Otherwise, ignore errors (allow page to load normally)
-      console.error("Error in login route guard:", error);
+      // Ignore AbortError and other errors - allow page to load normally
+      // AbortError happens when navigation is cancelled, which is expected behavior
+      if (error?.name !== "AbortError") {
+        console.error("Error in login route guard:", error);
+      }
     }
   },
 });
@@ -91,10 +107,11 @@ const setPasswordRoute = createRoute({
       const { supabase } = await import("./lib/supabase");
       const {
         data: { session },
+        error: sessionError,
       } = await supabase.auth.getSession();
 
-      // If no session, redirect to login
-      if (!session) {
+      // If no session or error, redirect to login
+      if (sessionError || !session) {
         throw redirect({
           to: "/login",
         });
@@ -103,24 +120,39 @@ const setPasswordRoute = createRoute({
       // If onboarding is already complete, redirect to app
       // This prevents users from revisiting the onboarding page
       if (session.user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("onboarding_complete")
-          .eq("id", session.user.id)
-          .single();
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from("profiles")
+            .select("onboarding_complete")
+            .eq("id", session.user.id)
+            .single();
 
-        const isComplete = profile?.onboarding_complete ?? false;
-
-        if (isComplete) {
-          throw redirect({
-            to: "/app",
-          });
+          // If profile exists and onboarding is complete, redirect
+          if (!profileError) {
+            const isComplete = profile?.onboarding_complete ?? false;
+            if (isComplete) {
+              throw redirect({
+                to: "/app",
+              });
+            }
+          }
+          // If profile doesn't exist, allow access (user needs to complete onboarding)
+        } catch (profileErr) {
+          // If this is a redirect, re-throw it
+          if (profileErr && typeof profileErr === "object" && "to" in profileErr) {
+            throw profileErr;
+          }
+          // Otherwise, allow access (user can complete onboarding)
         }
       }
     } catch (error) {
       // If redirect was thrown, re-throw it
       if (error && typeof error === "object" && "to" in error) {
         throw error;
+      }
+      // Ignore AbortError - it happens when navigation is cancelled
+      if (error?.name === "AbortError") {
+        return; // Allow page to load
       }
       // Otherwise, redirect to login on error
       throw redirect({
@@ -169,8 +201,15 @@ function RootLayout() {
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate({ to: "/login" });
+    try {
+      await signOut();
+      // Navigate after sign out completes
+      navigate({ to: "/login", replace: true });
+    } catch (error) {
+      // Even if signOut fails, try to navigate
+      console.error("Error during sign out:", error);
+      navigate({ to: "/login", replace: true });
+    }
   };
 
   return (

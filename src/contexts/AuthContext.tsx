@@ -127,11 +127,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Sign out function
-  // Clears session and redirects to login
+  // Clears session and all auth state
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Error signing out:", error);
+    } finally {
+      // Always clear state, even if signOut fails
+      setUser(null);
+      setSession(null);
+      setOnboardingComplete(null);
+    }
   };
 
   const value: AuthContextType = {

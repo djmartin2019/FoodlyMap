@@ -14,7 +14,7 @@ interface FormErrors {
 }
 
 export default function SetPasswordPage() {
-  const { user } = useAuth();
+  const { user, checkOnboardingStatus } = useAuth();
   const navigate = useNavigate();
 
   const [password, setPassword] = useState("");
@@ -142,13 +142,18 @@ export default function SetPasswordPage() {
       // Get current user
       const {
         data: { user: currentUser },
+        error: getUserError,
       } = await supabase.auth.getUser();
 
-      if (!currentUser) {
+      if (getUserError || !currentUser) {
+        console.error("Error getting user:", getUserError);
         setErrors({ general: "Session expired. Please try again." });
+        setLoading(false);
         navigate({ to: "/login" });
         return;
       }
+
+      console.log("Updating password for user:", currentUser.id);
 
       // Step 1: Update password
       const { error: passwordError } = await supabase.auth.updateUser({
@@ -156,12 +161,15 @@ export default function SetPasswordPage() {
       });
 
       if (passwordError) {
+        console.error("Password update error:", passwordError);
         setErrors({
           general: passwordError.message || "Failed to update password. Please try again.",
         });
         setLoading(false);
         return;
       }
+
+      console.log("Password updated successfully");
 
       // Step 2: Insert or update profile with onboarding_complete = true
       const profileData = {
@@ -174,30 +182,42 @@ export default function SetPasswordPage() {
         created_at: new Date().toISOString(),
       };
 
-      const { error: profileError } = await supabase.from("profiles").upsert(profileData, {
-        onConflict: "id",
-      });
+      console.log("Creating profile:", profileData);
+
+      const { data: profileDataResult, error: profileError } = await supabase
+        .from("profiles")
+        .upsert(profileData, {
+          onConflict: "id",
+        })
+        .select()
+        .single();
 
       if (profileError) {
+        console.error("Profile creation error:", profileError);
         // Handle unique constraint violation
         if (profileError.code === "23505" || profileError.message.includes("duplicate")) {
           setErrors({ username: "This username is already taken. Please choose another." });
         } else {
           setErrors({
-            general: "Failed to save profile. Please try again.",
+            general: `Failed to save profile: ${profileError.message || "Please try again."}`,
           });
         }
         setLoading(false);
         return;
       }
 
-      // Success: Show brief success state then redirect
-      // Small delay to show success feedback
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      navigate({ to: "/app" });
+      console.log("Profile created successfully:", profileDataResult);
+
+      // Update auth context onboarding status
+      await checkOnboardingStatus();
+
+      // Use hard redirect to ensure auth state is fully refreshed
+      // This prevents issues where the auth context hasn't updated yet
+      window.location.href = "/app";
     } catch (err) {
+      console.error("Unexpected error in form submission:", err);
       setErrors({
-        general: "An unexpected error occurred. Please try again.",
+        general: `An unexpected error occurred: ${err instanceof Error ? err.message : "Please try again."}`,
       });
       setLoading(false);
     }

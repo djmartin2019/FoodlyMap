@@ -6,8 +6,15 @@ export default function AppPage() {
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate({ to: "/login" });
+    try {
+      await signOut();
+      // Navigate after sign out completes
+      navigate({ to: "/login", replace: true });
+    } catch (error) {
+      // Even if signOut fails, try to navigate
+      console.error("Error during sign out:", error);
+      navigate({ to: "/login", replace: true });
+    }
   };
 
   return (
