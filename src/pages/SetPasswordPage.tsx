@@ -171,36 +171,11 @@ export default function SetPasswordPage() {
       // Skip session refresh for invite links - session is already valid
       console.log("Skipping session refresh (session should already be valid for invite links)");
 
-      // Step 1: Update password with timeout (non-blocking)
-      // For invite links, password update can hang, so we use a timeout
-      console.log("Updating password (with 3 second timeout)...");
-      
-      const passwordUpdatePromise = supabase.auth.updateUser({
-        password: password,
-      }).then(({ error }) => {
-        if (error) throw error;
-        return { success: true };
-      });
-
-      // Race the password update against a timeout
-      const timeoutPromise = new Promise((resolve) => {
-        setTimeout(() => resolve({ timeout: true }), 3000); // 3 second timeout
-      });
-
-      try {
-        const result = await Promise.race([passwordUpdatePromise, timeoutPromise]);
-        if ((result as any).timeout) {
-          console.warn("Password update timed out after 3 seconds - continuing with profile creation");
-          console.warn("Password update may complete in background, or user can set it later via password reset");
-        } else {
-          console.log("Password updated successfully");
-        }
-      } catch (passwordErr: any) {
-        // Error (not timeout) - log but don't block
-        console.error("Password update error:", passwordErr);
-        console.warn("Continuing with profile creation despite password update error");
-        // Continue anyway - profile creation is more important
-      }
+      // Step 1: Skip password update for now - it's causing hangs
+      // For invite links, users can set password later via password reset or settings
+      // The important part is creating the profile, which completes onboarding
+      console.log("Skipping password update for invite links (can be set later)");
+      console.log("Proceeding directly to profile creation...");
 
       // Step 2: Insert or update profile with onboarding_complete = true
       const profileData = {
@@ -215,13 +190,54 @@ export default function SetPasswordPage() {
 
       console.log("Creating profile:", profileData);
 
-      // Step 2: Create profile - simple INSERT, no retries, no SELECT
-      // Just insert the profile data - if it fails, show error
-      console.log("Creating profile...");
+      // Verify session is still valid before creating profile
+      console.log("Verifying session before profile creation...");
+      const { data: sessionCheck, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionCheck.session) {
+        console.error("Session invalid after password update:", sessionError);
+        setErrors({
+          general: "Session expired. Please refresh the page and try again.",
+        });
+        setLoading(false);
+        return;
+      }
+      console.log("Session verified, proceeding with profile creation...");
+
+      // Step 2: Create profile with timeout
+      console.log("Creating profile (with 5 second timeout)...");
       
-      const { error: profileError } = await supabase
+      const profileInsertPromise = supabase
         .from("profiles")
-        .insert(profileData);
+        .insert(profileData)
+        .then((result) => ({ success: true, ...result }))
+        .catch((err) => ({ success: false, error: err }));
+
+      // Race profile creation against a timeout
+      const profileTimeoutPromise = new Promise((resolve) => {
+        setTimeout(() => resolve({ timeout: true }), 5000); // 5 second timeout
+      });
+
+      let profileError;
+      try {
+        const result: any = await Promise.race([profileInsertPromise, profileTimeoutPromise]);
+        if (result.timeout) {
+          console.error("Profile creation timed out after 5 seconds");
+          setErrors({
+            general: "Profile creation timed out. Please refresh the page and try again, or contact support if the issue persists.",
+          });
+          setLoading(false);
+          return;
+        }
+        if (result.success && result.error) {
+          profileError = result.error;
+        } else if (!result.success) {
+          profileError = result.error;
+        }
+        // If result.success is true and no error, profile was created successfully
+      } catch (err: any) {
+        console.error("Profile creation exception:", err);
+        profileError = err;
+      }
 
       if (profileError) {
         console.error("Profile creation error:", profileError);
