@@ -34,14 +34,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
 
       if (error) {
-        // Profile doesn't exist yet or other error
-        return false;
+        // Check if it's a "not found" error (profile doesn't exist) vs other error
+        if (error.code === "PGRST116" || error.message?.includes("No rows")) {
+          // Profile doesn't exist - user needs onboarding
+          return false;
+        }
+        // Other error - log it but return null to indicate we couldn't determine status
+        console.error("Error checking onboarding status:", error);
+        return null;
       }
 
+      // Return the actual value (true/false), or false if null
       return data?.onboarding_complete ?? false;
     } catch (err) {
       console.error("Error checking onboarding status:", err);
-      return false;
+      return null; // Return null on exception to indicate status unknown
     }
   };
 

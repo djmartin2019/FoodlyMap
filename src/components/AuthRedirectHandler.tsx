@@ -71,51 +71,23 @@ export function AuthRedirectHandler() {
       return;
     }
 
-    // Only redirect from /login on initial auth events
-    // Allow authenticated users to freely navigate to home page and other public routes
-    // This prevents the "flash and redirect" issue when clicking the logo
-    if (currentPath === "/login") {
-      // Double-check conditions haven't changed
-      if (isNavigating.current || hasRedirected.current || !user || !isInitialAuthEvent.current) {
-        return;
-      }
-
-      // If onboarding status is null or false, redirect to set-password
-      if (onboardingComplete === null || onboardingComplete === false) {
-        hasRedirected.current = true;
-        isNavigating.current = true;
-        navigate({ to: "/set-password", replace: true })
-          .catch(() => {
-            // Ignore navigation errors
-          })
-          .finally(() => {
-            isNavigating.current = false;
-            isInitialAuthEvent.current = false; // Reset after redirect
-          });
-      } else if (onboardingComplete === true) {
-        hasRedirected.current = true;
-        isNavigating.current = true;
-        navigate({ to: "/app", replace: true })
-          .catch(() => {
-            // Ignore navigation errors
-          })
-          .finally(() => {
-            isNavigating.current = false;
-            isInitialAuthEvent.current = false; // Reset after redirect
-          });
-      }
-      return;
-    }
+    // Only redirect for invite links (when user lands on / or /login with hash)
+    // Normal logins are handled by route guards, not this component
+    // We detect invite links by checking if onboarding status is determined
+    // and if it's false/null, OR if we're on /login and onboarding is still being checked
     
-    // For invite links that land on home page (/), also redirect once
-    // But only on initial auth events, not manual navigation
+    // For invite links that land on home page (/)
+    // Only redirect if onboarding is explicitly false (not null, not true)
+    // null means status is still being checked - wait for it
     if (currentPath === "/" && isInitialAuthEvent.current && !hasRedirected.current) {
       if (isNavigating.current || hasRedirected.current || !user || !isInitialAuthEvent.current) {
         return;
       }
 
-      // If onboarding status is null or false, redirect to set-password (invite link flow)
-      if (onboardingComplete === null || onboardingComplete === false) {
+      // Only redirect if onboarding is explicitly false (new user from invite link)
+      // If null, wait for the check to complete
+      // If true, don't redirect (existing user)
+      if (onboardingComplete === false) {
         hasRedirected.current = true;
         isNavigating.current = true;
         navigate({ to: "/set-password", replace: true })
@@ -132,6 +104,38 @@ export function AuthRedirectHandler() {
         hasRedirected.current = true; // Mark as handled
         isInitialAuthEvent.current = false; // Reset
       }
+      // If onboardingComplete is null, wait for it to be determined
+      return;
+    }
+    
+    // For /login - only redirect if onboarding is explicitly false
+    // Normal logins are handled by the route guard, not this component
+    // This only handles invite links that land on /login
+    if (currentPath === "/login" && isInitialAuthEvent.current && !hasRedirected.current) {
+      if (isNavigating.current || hasRedirected.current || !user || !isInitialAuthEvent.current) {
+        return;
+      }
+
+      // Only redirect if onboarding is explicitly false (new user from invite link)
+      // If null, the route guard will handle it
+      // If true, the route guard will redirect to /app
+      if (onboardingComplete === false) {
+        hasRedirected.current = true;
+        isNavigating.current = true;
+        navigate({ to: "/set-password", replace: true })
+          .catch(() => {
+            // Ignore navigation errors
+          })
+          .finally(() => {
+            isNavigating.current = false;
+            isInitialAuthEvent.current = false; // Reset after redirect
+          });
+      } else if (onboardingComplete === true) {
+        // If onboarding is complete, route guard will handle redirect to /app
+        hasRedirected.current = true; // Mark as handled
+        isInitialAuthEvent.current = false; // Reset
+      }
+      // If onboardingComplete is null, let route guard handle it
       return;
     }
   }, [user, onboardingComplete, loading, navigate, routerState.location.pathname]);

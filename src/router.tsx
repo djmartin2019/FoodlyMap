@@ -69,10 +69,26 @@ const loginRoute = createRoute({
           .eq("id", session.user.id)
           .single();
 
-        // If profile doesn't exist or error, assume onboarding incomplete
-        const isComplete = profileError ? false : (profile?.onboarding_complete ?? false);
+        // Handle errors - if profile doesn't exist, user needs onboarding
+        // If other error, log it but assume incomplete for safety
+        let isComplete = false;
+        if (profileError) {
+          // Check if it's a "not found" error (profile doesn't exist)
+          if (profileError.code === "PGRST116" || profileError.message?.includes("No rows")) {
+            // Profile doesn't exist - user needs onboarding
+            isComplete = false;
+          } else {
+            // Other error - log it but assume incomplete
+            console.error("Error checking onboarding status in route guard:", profileError);
+            isComplete = false;
+          }
+        } else {
+          // Profile exists - use the actual value
+          isComplete = profile?.onboarding_complete ?? false;
+        }
 
         // Redirect based on onboarding status
+        // Only redirect to /set-password if onboarding is explicitly incomplete
         throw redirect({
           to: isComplete ? "/app" : "/set-password",
         });
@@ -128,16 +144,17 @@ const setPasswordRoute = createRoute({
             .eq("id", session.user.id)
             .single();
 
-          // If profile exists and onboarding is complete, redirect
+          // If profile exists and onboarding is explicitly true, redirect to app
           if (!profileError && profile) {
             const isComplete = profile.onboarding_complete ?? false;
-            if (isComplete) {
+            if (isComplete === true) {
               throw redirect({
                 to: "/app",
               });
             }
           }
           // If profile doesn't exist or error, allow access (user needs to complete onboarding)
+          // This is the correct behavior for new users from invite links
         } catch (profileErr) {
           // If this is a redirect, re-throw it
           if (profileErr && typeof profileErr === "object" && "to" in profileErr) {
