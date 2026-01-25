@@ -94,7 +94,7 @@ export const router = createRouter({ routeTree });
 function RootLayout() {
   const currentYear = new Date().getFullYear();
   // Use auth context to show/hide navigation items
-  const { user, signOut, loading } = useAuth();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
