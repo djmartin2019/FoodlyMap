@@ -87,12 +87,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // We should NOT redirect here - it interrupts Supabase's hash processing
       // The route guard and component will handle navigation if needed
       if (event === "PASSWORD_RECOVERY" && session?.user) {
-        // Just log - don't redirect
-        // The recovery link's redirect_to already sends user to /reset-password
-        // Supabase is still processing the hash, so we must not interrupt
-        console.log("PASSWORD_RECOVERY event detected - session established");
-        setLoading(false);
-        return; // Don't check onboarding for recovery sessions
+        // Only handle PASSWORD_RECOVERY if we're actually on the reset-password page
+        // This prevents stale recovery sessions from interfering with normal login
+        const currentPath = window.location.pathname;
+        if (currentPath === "/reset-password") {
+          console.log("PASSWORD_RECOVERY event detected - session established");
+          setLoading(false);
+          return; // Don't check onboarding for recovery sessions
+        } else {
+          // Recovery session detected but not on reset-password page
+          // This is likely a stale session - clear it
+          console.warn("Stale PASSWORD_RECOVERY session detected, clearing...");
+          supabase.auth.signOut().catch(() => {
+            // Ignore errors - we're just cleaning up
+          });
+          setSession(null);
+          setUser(null);
+          setOnboardingComplete(null);
+          setLoading(false);
+          return;
+        }
       }
 
       // Handle SIGNED_IN event (invite links, magic links, normal login)
@@ -133,6 +147,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Only handles email/password login (no signup)
   const signIn = async (email: string, password: string) => {
     try {
+      // Clear any stale recovery sessions before signing in
+      // This prevents PASSWORD_RECOVERY events from interfering with normal login
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (currentSession) {
+        // If there's a stale session (especially recovery session), clear it first
+        try {
+          await supabase.auth.signOut();
+          // Small delay to let signOut complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (signOutError: any) {
+          // Ignore signOut errors - we're just cleaning up
+          if (signOutError?.name !== "AbortError") {
+            console.warn("Error clearing stale session:", signOutError);
+          }
+        }
+      }
+
+      // Now attempt sign in
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -143,23 +175,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       return { error: null };
-    } catch (err) {
+    } catch (err: any) {
+      // Handle AbortError gracefully - it's common during navigation
+      if (err?.name === "AbortError") {
+        return { error: new Error("Login was cancelled") };
+      }
       return { error: err as Error };
     }
   };
 
   // Sign out function
-  // Clears session and all auth state
+  // Clears session and all auth state, including stale recovery sessions
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.error("Error signing out:", error);
+      // Sign out from Supabase (with timeout to prevent hanging)
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Sign out timeout")), 3000)
+        )
+      ]);
+    } catch (error: any) {
+      // Log but don't block - we'll clear state anyway
+      // AbortError is common when navigation happens during signOut
+      if (error?.name !== "AbortError" && error?.message !== "Sign out timeout") {
+        console.error("Error signing out:", error);
+      }
     } finally {
       // Always clear state, even if signOut fails
+      // This ensures clean state even if Supabase signOut hangs
       setUser(null);
       setSession(null);
       setOnboardingComplete(null);
+      
+      // Clear any stale Supabase storage to prevent recovery session conflicts
+      try {
+        // Clear Supabase's localStorage keys
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith("sb-") || key.includes("supabase"))) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+      } catch (storageError) {
+        // Ignore storage errors - not critical
+        console.warn("Error clearing storage:", storageError);
+      }
     }
   };
 

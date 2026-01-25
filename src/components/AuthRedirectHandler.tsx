@@ -24,6 +24,7 @@ export function AuthRedirectHandler() {
   const hasRedirected = useRef(false); // Prevent multiple redirects
   const isNavigating = useRef(false); // Track if navigation is in progress
   const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const previousPathRef = useRef<string | null>(null); // Track previous path
 
   useEffect(() => {
     // Cleanup any pending redirects
@@ -31,6 +32,15 @@ export function AuthRedirectHandler() {
       clearTimeout(redirectTimeoutRef.current);
       redirectTimeoutRef.current = null;
     }
+
+    const currentPath = routerState.location.pathname;
+    
+    // Reset redirect flag when path changes (user navigated manually)
+    // This allows manual navigation to work properly
+    if (previousPathRef.current !== null && previousPathRef.current !== currentPath) {
+      hasRedirected.current = false; // User navigated manually, allow navigation
+    }
+    previousPathRef.current = currentPath;
 
     // Don't redirect while loading, if no user, or if navigation is already in progress
     if (loading || !user || isNavigating.current) {
@@ -41,23 +51,16 @@ export function AuthRedirectHandler() {
     }
 
     // Prevent multiple redirects for the same auth event
+    // But allow manual navigation by resetting on path change
     if (hasRedirected.current) {
       return;
     }
 
-    const currentPath = routerState.location.pathname;
-    const protectedRoutes = ["/app", "/set-password", "/reset-password"];
-    
-    // Don't redirect if we're already on a protected route
-    if (protectedRoutes.includes(currentPath)) {
-      return; // Already on the right page
-    }
-
-    // Only redirect if we're on a public route and user is authenticated
-    // This handles invite/magic link flows and normal login
-    const publicRoutes = ["/", "/login", "/contact", "/request-access"];
-
-    if (publicRoutes.includes(currentPath)) {
+    // Only redirect from /login if user is authenticated
+    // Allow authenticated users to freely navigate to home, contact, app, etc.
+    // This handles invite/magic link flows where users land on /login after authentication
+    // Once redirected, users can navigate freely - we don't block manual navigation
+    if (currentPath === "/login") {
       // Only redirect if onboarding status is determined (not null)
       // Use a small timeout to let auth state settle and avoid conflicts
       redirectTimeoutRef.current = setTimeout(() => {
