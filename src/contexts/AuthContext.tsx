@@ -154,21 +154,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Only handles email/password login (no signup)
   const signIn = async (email: string, password: string) => {
     try {
-      // Clear any stale recovery sessions before signing in
+      // Clear any stale recovery sessions before signing in (non-blocking)
       // This prevents PASSWORD_RECOVERY events from interfering with normal login
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       if (currentSession) {
-        // If there's a stale session (especially recovery session), clear it first
-        try {
-          await supabase.auth.signOut();
-          // Small delay to let signOut complete
-          await new Promise(resolve => setTimeout(resolve, 100));
-        } catch (signOutError: any) {
-          // Ignore signOut errors - we're just cleaning up
-          if (signOutError?.name !== "AbortError") {
-            console.warn("Error clearing stale session:", signOutError);
-          }
-        }
+        // Clear stale session in background - don't wait for it
+        supabase.auth.signOut().catch(() => {
+          // Ignore errors - we're just cleaning up
+        });
       }
 
       // Now attempt sign in

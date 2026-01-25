@@ -1,5 +1,5 @@
 import { useState, FormEvent } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 
@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
   const { signIn } = useAuth();
+  const navigate = useNavigate();
 
   // Handle login form submission
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -30,11 +31,33 @@ export default function LoginPage() {
       return;
     }
 
-    // Success: Don't navigate manually - let AuthRedirectHandler handle it
-    // This prevents race conditions and multiple redirects
-    // The auth context will update via onAuthStateChange, which triggers
-    // AuthRedirectHandler to redirect based on onboarding status
-    setLoading(false);
+    // Success: Check onboarding status and navigate immediately
+    // This is faster than waiting for AuthRedirectHandler or route guards
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        setLoading(false);
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("onboarding_complete")
+        .eq("id", session.user.id)
+        .single();
+
+      const isComplete = profileError 
+        ? false 
+        : (profile?.onboarding_complete ?? false);
+
+      setLoading(false);
+      // Navigate directly to the correct page based on onboarding status
+      navigate({ to: isComplete ? "/app" : "/set-password", replace: true });
+    } catch (err) {
+      // If check fails, default to /app (route guard will handle it)
+      setLoading(false);
+      navigate({ to: "/app", replace: true });
+    }
   };
 
   // Handle forgot password form submission
