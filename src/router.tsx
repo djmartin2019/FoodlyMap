@@ -14,6 +14,7 @@ import AppPage from "./pages/AppPage";
 import RequestAccessPage from "./pages/RequestAccessPage";
 import SetPasswordPage from "./pages/SetPasswordPage";
 import { useAuth } from "./contexts/AuthContext";
+import { AuthRedirectHandler } from "./components/AuthRedirectHandler";
 
 // Root route with layout
 const rootRoute = createRootRoute({
@@ -40,22 +41,31 @@ const requestAccessRoute = createRoute({
   component: RequestAccessPage,
 });
 
-// Login route (public, but redirects to /app if already authenticated)
+// Login route (public, but redirects based on onboarding status if already authenticated)
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
   component: LoginPage,
   beforeLoad: async () => {
     // Check if user is already authenticated
-    // If so, redirect to protected app route
     const { supabase } = await import("./lib/supabase");
     const {
       data: { session },
     } = await supabase.auth.getSession();
 
-    if (session) {
+    if (session?.user) {
+      // Check onboarding status
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_complete")
+        .eq("id", session.user.id)
+        .single();
+
+      const isComplete = profile?.onboarding_complete ?? false;
+
+      // Redirect based on onboarding status
       throw redirect({
-        to: "/app",
+        to: isComplete ? "/app" : "/set-password",
       });
     }
   },
@@ -78,6 +88,24 @@ const setPasswordRoute = createRoute({
       throw redirect({
         to: "/login",
       });
+    }
+
+    // If onboarding is already complete, redirect to app
+    // This prevents users from revisiting the onboarding page
+    if (session.user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_complete")
+        .eq("id", session.user.id)
+        .single();
+
+      const isComplete = profile?.onboarding_complete ?? false;
+
+      if (isComplete) {
+        throw redirect({
+          to: "/app",
+        });
+      }
     }
   },
 });
@@ -127,6 +155,8 @@ function RootLayout() {
 
   return (
     <div className="min-h-screen bg-bg text-text flex flex-col">
+      {/* Global auth redirect handler for invite/magic links */}
+      <AuthRedirectHandler />
       <nav className="sticky top-0 z-10 border-b border-surface bg-bg/90 backdrop-blur" aria-label="Main navigation">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4">
           <Link

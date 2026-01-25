@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { User, Session } from "@supabase/supabase-js";
+import { User, Session, AuthChangeEvent } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 
 // Auth context type definition
@@ -7,8 +7,10 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  onboardingComplete: boolean | null; // null = not checked yet, true/false = checked
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  checkOnboardingStatus: () => Promise<boolean | null>;
 }
 
 // Create context with undefined default (will be set by provider)
@@ -20,28 +22,88 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
+
+  // Check onboarding status from profiles table
+  const checkOnboardingStatus = async (userId: string): Promise<boolean | null> => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("onboarding_complete")
+        .eq("id", userId)
+        .single();
+
+      if (error) {
+        // Profile doesn't exist yet or other error
+        return false;
+      }
+
+      return data?.onboarding_complete ?? false;
+    } catch (err) {
+      console.error("Error checking onboarding status:", err);
+      return false;
+    }
+  };
 
   // Initialize auth state on mount
   useEffect(() => {
     // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      
+      // Check onboarding status if user exists
+      if (session?.user) {
+        const isComplete = await checkOnboardingStatus(session.user.id);
+        setOnboardingComplete(isComplete);
+      } else {
+        setOnboardingComplete(null);
+      }
+      
       setLoading(false);
     });
 
-    // Listen for auth state changes (login, logout, token refresh)
+    // Global auth state listener
+    // This handles invite links, magic links, and normal logins
+    // We listen for SIGNED_IN events to redirect users to the correct page
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+
+      // Handle SIGNED_IN event (invite links, magic links, login)
+      if (event === "SIGNED_IN" && session?.user) {
+        // Check onboarding status
+        const isComplete = await checkOnboardingStatus(session.user.id);
+        setOnboardingComplete(isComplete);
+
+        // Navigation will be handled by route guards based on onboarding status
+        // This prevents redirect loops and ensures correct routing
+      } else if (event === "SIGNED_OUT") {
+        setOnboardingComplete(null);
+      } else if (session?.user) {
+        // For other events (like TOKEN_REFRESHED), check status
+        const isComplete = await checkOnboardingStatus(session.user.id);
+        setOnboardingComplete(isComplete);
+      } else {
+        setOnboardingComplete(null);
+      }
+
       setLoading(false);
     });
 
     // Cleanup subscription on unmount
     return () => subscription.unsubscribe();
   }, []);
+
+  // Expose checkOnboardingStatus for manual checks
+  const checkOnboardingStatusPublic = async (): Promise<boolean | null> => {
+    if (!user) return null;
+    const status = await checkOnboardingStatus(user.id);
+    setOnboardingComplete(status);
+    return status;
+  };
 
   // Sign in function for closed beta users
   // Only handles email/password login (no signup)
@@ -74,8 +136,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     session,
     loading,
+    onboardingComplete,
     signIn,
     signOut,
+    checkOnboardingStatus: checkOnboardingStatusPublic,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

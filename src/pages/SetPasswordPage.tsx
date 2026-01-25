@@ -163,13 +163,14 @@ export default function SetPasswordPage() {
         return;
       }
 
-      // Step 2: Insert or update profile
+      // Step 2: Insert or update profile with onboarding_complete = true
       const profileData = {
         id: currentUser.id,
         username: username.toLowerCase().trim(),
         first_name: firstName.trim(),
         last_name: lastName.trim() || null,
         phone: phone.trim() || null,
+        onboarding_complete: true, // Mark onboarding as complete
         created_at: new Date().toISOString(),
       };
 
