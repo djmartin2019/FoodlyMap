@@ -1,6 +1,6 @@
 import { useState, FormEvent, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { supabase } from "../lib/supabase";
+import { useAuth } from "../contexts/AuthContext";
 
 interface FormErrors {
   password?: string;
@@ -16,42 +16,26 @@ export default function ResetPasswordPage() {
   const [checkingSession, setCheckingSession] = useState(true);
   const navigate = useNavigate();
 
+  const { initialized, session } = useAuth();
+
   // Check session on mount - required for password reset
   // PASSWORD_RECOVERY events create a temporary session that must be active
-  // IMPORTANT: Wait for Supabase to process the hash from the recovery link
-  // The hash might still be in the URL when this component mounts
+  // Use auth context instead of direct getSession call
   useEffect(() => {
-    const checkSession = async () => {
-      // Give Supabase time to process the hash from the recovery link
-      // Recovery links include hash tokens that Supabase needs to process
-      await new Promise((resolve) => setTimeout(resolve, 500));
+    if (!initialized) return;
 
-      try {
-        // Check session - Supabase should have processed the hash by now
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
+    if (!session) {
+      // No session means the recovery link is invalid or expired
+      console.error("No active session for password reset");
+      console.error("This usually means the recovery link has expired or was already used");
+      navigate({ to: "/login", replace: true });
+      return;
+    }
 
-        if (sessionError || !session) {
-          // No session means the recovery link is invalid or expired
-          console.error("No active session for password reset:", sessionError);
-          console.error("This usually means the recovery link has expired or was already used");
-          navigate({ to: "/login", replace: true });
-          return;
-        }
-
-        // Session exists - allow user to reset password
-        console.log("Recovery session found, allowing password reset");
-        setCheckingSession(false);
-      } catch (error) {
-        console.error("Error checking session:", error);
-        navigate({ to: "/login", replace: true });
-      }
-    };
-
-    checkSession();
-  }, [navigate]);
+    // Session exists - allow user to reset password
+    console.log("Recovery session found, allowing password reset");
+    setCheckingSession(false);
+  }, [initialized, session, navigate]);
 
   // Validate form
   const validateForm = (): boolean => {

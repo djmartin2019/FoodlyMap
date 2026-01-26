@@ -2,7 +2,7 @@ import { useState, FormEvent, useEffect, useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
-import { RequireAuth } from "../components/ProtectedRoute";
+import { RequireAuth } from "../components/RequireAuth";
 
 interface FormErrors {
   username?: string;
@@ -13,7 +13,7 @@ interface FormErrors {
 }
 
 export default function SetPasswordPage() {
-  const { user, checkOnboardingStatus } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [username, setUsername] = useState("");
@@ -25,9 +25,8 @@ export default function SetPasswordPage() {
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [profileCreated, setProfileCreated] = useState(false);
-  const [redirectCountdown, setRedirectCountdown] = useState(3);
 
-  // ProtectedRoute handles auth checking and redirects
+  // RequireAuth handles auth checking and redirects
   // No need for manual session check here
 
   // Validate username format
@@ -155,59 +154,22 @@ export default function SetPasswordPage() {
 
       console.log("Creating profile:", profileData);
 
-      // Verify session is still valid before creating profile
-      console.log("Verifying session before profile creation...");
-      const { data: sessionCheck, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !sessionCheck.session) {
-        console.error("Session invalid after password update:", sessionError);
-        setErrors({
-          general: "Session expired. Please refresh the page and try again.",
-        });
-        setLoading(false);
-        return;
-      }
-      console.log("Session verified, proceeding with profile creation...");
+      // Session should be valid (we're in RequireAuth wrapper)
+      // No need to verify again - auth context already ensures session exists
+      console.log("Proceeding with profile creation...");
 
-      // Step 2: Create profile with timeout
-      console.log("Creating profile (with 5 second timeout)...");
+      // Step 2: Create profile
+      console.log("Creating profile...");
       
-      // Wrap the Supabase call in a proper Promise
-      const profileInsertPromise = new Promise<{ success: boolean; error?: any }>(async (resolve) => {
-        try {
-          const result = await supabase
-            .from("profiles")
-            .insert(profileData);
-          
-          if (result.error) {
-            resolve({ success: false, error: result.error });
-          } else {
-            resolve({ success: true });
-          }
-        } catch (err: any) {
-          resolve({ success: false, error: err });
-        }
-      });
-
-      // Race profile creation against a timeout
-      const profileTimeoutPromise = new Promise<{ timeout: boolean }>((resolve) => {
-        setTimeout(() => resolve({ timeout: true }), 5000); // 5 second timeout
-      });
-
       let profileError;
       try {
-        const result: any = await Promise.race([profileInsertPromise, profileTimeoutPromise]);
-        if (result.timeout) {
-          console.error("Profile creation timed out after 5 seconds");
-          setErrors({
-            general: "Profile creation timed out. Please refresh the page and try again, or contact support if the issue persists.",
-          });
-          setLoading(false);
-          return;
+        const { error: insertError } = await supabase
+          .from("profiles")
+          .insert(profileData);
+        
+        if (insertError) {
+          profileError = insertError;
         }
-        if (!result.success && result.error) {
-          profileError = result.error;
-        }
-        // If result.success is true, profile was created successfully
       } catch (err: any) {
         console.error("Profile creation exception:", err);
         profileError = err;
@@ -284,24 +246,12 @@ export default function SetPasswordPage() {
 
       console.log("Password reset email sent successfully");
 
-      // Update auth context onboarding status
-      await checkOnboardingStatus();
-
-      // Show success message with countdown, then redirect to login
+      // Show success message, then redirect to login
       setProfileCreated(true);
       setLoading(false);
       
-      // Start countdown and redirect
-      let countdown = 3;
-      setRedirectCountdown(countdown);
-      const countdownInterval = setInterval(() => {
-        countdown--;
-        setRedirectCountdown(countdown);
-        if (countdown <= 0) {
-          clearInterval(countdownInterval);
-          window.location.href = "/login";
-        }
-      }, 1000);
+      // Redirect to login immediately (no countdown needed)
+      navigate({ to: "/login", replace: true, search: {} });
     } catch (err) {
       console.error("Unexpected error in form submission:", err);
       setErrors({
@@ -364,14 +314,9 @@ export default function SetPasswordPage() {
               <p className="text-sm text-text/60">
                 Please check your inbox and click the link to set your password. Once you've set your password, you'll be able to sign in.
               </p>
-              {redirectCountdown > 0 && (
-                <p className="mt-2 text-sm text-text/50">
-                  Redirecting to sign in in {redirectCountdown} second{redirectCountdown !== 1 ? 's' : ''}...
-                </p>
-              )}
             </div>
             <button
-              onClick={() => window.location.href = "/login"}
+              onClick={() => navigate({ to: "/login", replace: true, search: {} })}
               className="w-full rounded-lg border-2 border-accent/60 bg-surface/80 px-6 py-3 text-base font-semibold text-accent shadow-glow transition-all duration-300 hover:-translate-y-0.5 hover:border-accent hover:bg-accent/10 hover:shadow-glow-lg"
             >
               Go to Sign In Now

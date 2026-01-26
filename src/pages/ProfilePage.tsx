@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
-import { RequireAuth } from "../components/ProtectedRoute";
+import { RequireAuth } from "../components/RequireAuth";
 
 interface Profile {
   id: string;

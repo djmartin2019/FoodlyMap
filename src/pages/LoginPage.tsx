@@ -12,93 +12,30 @@ export default function LoginPage() {
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
-  const { signIn, user, onboardingComplete, loading: authLoading } = useAuth();
+
+  const { user, signInWithPassword } = useAuth();
   const navigate = useNavigate();
-  const [justSignedIn, setJustSignedIn] = useState(false);
 
-  // Redirect if user is already authenticated (handles direct navigation to /login)
   useEffect(() => {
-    if (!authLoading && user) {
-      // User is already logged in, redirect based on onboarding status
-      const redirectAuthenticated = async () => {
-        try {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("onboarding_complete")
-            .eq("id", user.id)
-            .single();
-          
-          const isComplete = profile?.onboarding_complete ?? false;
-          navigate({ 
-            to: isComplete ? "/dashboard" : "/set-password", 
-            replace: true,
-            search: {}
-          });
-        } catch (err) {
-          // On error, default to dashboard
-          navigate({ to: "/dashboard", replace: true, search: {} });
-        }
-      };
-      redirectAuthenticated();
+    if (user) {
+      navigate({ to: "/dashboard", replace: true });
     }
-  }, [authLoading, user, navigate]);
+  }, [user, navigate]);  
 
-  // Navigate after successful sign-in
-  useEffect(() => {
-    // Only navigate if we just signed in and auth state is ready
-    if (!justSignedIn || authLoading || !user) {
-      return;
-    }
-
-    // Check onboarding status and navigate
-    const navigateAfterSignIn = async () => {
-      try {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("onboarding_complete")
-          .eq("id", user.id)
-          .single();
-        
-        const isComplete = profile?.onboarding_complete ?? false;
-        
-        navigate({ 
-          to: isComplete ? "/dashboard" : "/set-password", 
-          replace: true,
-          search: {}
-        });
-        
-        setJustSignedIn(false); // Reset flag
-      } catch (err) {
-        // On error, default to dashboard (route guard will handle it)
-        navigate({ to: "/dashboard", replace: true, search: {} });
-        setJustSignedIn(false);
-      }
-    };
-
-    navigateAfterSignIn();
-  }, [justSignedIn, authLoading, user, onboardingComplete, navigate]);
-
-  // Handle login form submission
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
-
-    // Attempt sign in
-    const { error: signInError } = await signIn(email, password);
-
-    if (signInError) {
-      // Display user-friendly error message
-      setError(signInError.message || "Invalid email or password");
+  
+    const { error } = await signInWithPassword(email, password);
+    if (error) {
+      setError(error.message || "Invalid email or password");
       setLoading(false);
       return;
     }
-
-    // Success: Sign-in completed
-    // Auth state will update via onAuthStateChange SIGNED_IN event
-    // Set flag to trigger navigation useEffect
+    // success → AuthContext updates `user`
+    // useEffect will redirect
     setLoading(false);
-    setJustSignedIn(true);
   };
 
   // Handle forgot password form submission
@@ -113,7 +50,7 @@ export default function LoginPage() {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         forgotPasswordEmail,
         {
-          redirectTo: "https://foodlymap.com/reset-password",
+          redirectTo: `${window.location.origin}/reset-password`,
         }
       );
 

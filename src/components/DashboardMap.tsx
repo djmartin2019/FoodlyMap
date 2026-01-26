@@ -119,7 +119,15 @@ export default function DashboardMap({
     if (mode === "ADD_PLACE") {
       // ADD_PLACE mode: Create temporary center-locked marker
       // This marker is not draggable - it stays at map center
+      // Get current center without changing map state
       const center = map.getCenter();
+      const currentZoom = map.getZoom();
+      
+      // Ensure map doesn't zoom out - maintain current zoom level
+      // This prevents the map from resetting when entering ADD_PLACE mode
+      if (currentZoom < 10) {
+        map.setZoom(11); // Minimum reasonable zoom for adding places
+      }
       
       // Remove existing temporary marker if it exists
       tempMarkerRef.current?.remove();
@@ -141,27 +149,37 @@ export default function DashboardMap({
       tempMarkerRef.current = new mapboxgl.Marker({ element: el })
         .setLngLat([center.lng, center.lat])
         .addTo(map);
+      
+      // Initial update of parent state with current center
+      if (onMapCenterChange) {
+        onMapCenterChange(center.lng, center.lat);
+      }
 
-      // Update temporary marker position when map moves
-      const updateTempMarker = () => {
+      // Update marker position visually during move (no state update)
+      const updateMarkerPosition = () => {
         if (tempMarkerRef.current && mode === "ADD_PLACE" && !hideTempMarker) {
           const newCenter = map.getCenter();
           tempMarkerRef.current.setLngLat([newCenter.lng, newCenter.lat]);
-          // Notify parent of center change
-          if (onMapCenterChange) {
-            onMapCenterChange(newCenter.lng, newCenter.lat);
-          }
         }
       };
 
-      // Listen to map move events to keep marker centered
-      map.on("move", updateTempMarker);
-      map.on("moveend", updateTempMarker);
+      // Update parent state only when movement ends (to avoid excessive re-renders)
+      const updateParentState = () => {
+        if (mode === "ADD_PLACE" && !hideTempMarker && onMapCenterChange) {
+          const newCenter = map.getCenter();
+          onMapCenterChange(newCenter.lng, newCenter.lat);
+        }
+      };
+
+      // Listen to map move events to keep marker visually centered (smooth updates)
+      map.on("move", updateMarkerPosition);
+      // Only update parent state when movement ends (prevents excessive re-renders)
+      map.on("moveend", updateParentState);
 
       // Store cleanup function
       const cleanup = () => {
-        map.off("move", updateTempMarker);
-        map.off("moveend", updateTempMarker);
+        map.off("move", updateMarkerPosition);
+        map.off("moveend", updateParentState);
       };
 
       return cleanup;

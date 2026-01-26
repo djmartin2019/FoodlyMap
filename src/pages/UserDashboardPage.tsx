@@ -5,7 +5,7 @@ import { useSearch } from "@tanstack/react-router";
 import DashboardMap, { MapMode, Place } from "../components/DashboardMap";
 import PlaceNameForm from "../components/PlaceNameForm";
 import LocationsTable, { Location } from "../components/LocationsTable";
-import { RequireAuth } from "../components/ProtectedRoute";
+import { RequireAuth } from "../components/RequireAuth";
 
 interface Category {
   id: string;
