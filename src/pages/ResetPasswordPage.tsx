@@ -1,6 +1,7 @@
 import { useState, FormEvent, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../lib/supabase";
 
 interface FormErrors {
   password?: string;
@@ -102,7 +103,7 @@ export default function ResetPasswordPage() {
         .then(() => {
           console.log("Signed out successfully");
         })
-        .catch((signOutError) => {
+        .catch((signOutError: any) => {
           console.warn("Sign out error (non-blocking):", signOutError);
         });
 

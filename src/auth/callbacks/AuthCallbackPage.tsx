@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { supabase } from "../lib/supabase";
+import { supabase } from "../../lib/supabase";
 import { useNavigate } from "@tanstack/react-router";
 
 export default function AuthCallbackPage() {
