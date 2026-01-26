@@ -6,6 +6,7 @@ import {
   createRouter,
   redirect,
   useNavigate,
+  useRouterState,
 } from "@tanstack/react-router";
 import DashboardPage from "./pages/DashboardPage";
 import ContactPage from "./pages/ContactPage";
@@ -48,70 +49,8 @@ const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
   component: LoginPage,
-  beforeLoad: async () => {
-    try {
-      // Check if user is already authenticated
-      const { supabase } = await import("./lib/supabase");
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-
-      // If there's an error or no session, allow page to load
-      if (sessionError || !session?.user) {
-        return;
-      }
-
-      // Check onboarding status with error handling
-      try {
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("onboarding_complete")
-          .eq("id", session.user.id)
-          .single();
-
-        // Handle errors - if profile doesn't exist, user needs onboarding
-        // If other error, log it but assume incomplete for safety
-        let isComplete = false;
-        if (profileError) {
-          // Check if it's a "not found" error (profile doesn't exist)
-          if (profileError.code === "PGRST116" || profileError.message?.includes("No rows")) {
-            // Profile doesn't exist - user needs onboarding
-            isComplete = false;
-          } else {
-            // Other error - log it but assume incomplete
-            console.error("Error checking onboarding status in route guard:", profileError);
-            isComplete = false;
-          }
-        } else {
-          // Profile exists - use the actual value
-          isComplete = profile?.onboarding_complete ?? false;
-        }
-
-        // Redirect based on onboarding status
-        // Only redirect to /set-password if onboarding is explicitly incomplete
-        throw redirect({
-          to: isComplete ? "/dashboard" : "/set-password",
-        });
-      } catch (profileErr) {
-        // If this is a redirect, re-throw it
-        if (profileErr && typeof profileErr === "object" && "to" in profileErr) {
-          throw profileErr;
-        }
-        // Otherwise, allow page to load (user can still log in)
-      }
-    } catch (error) {
-      // If redirect was thrown, re-throw it
-      if (error && typeof error === "object" && "to" in error) {
-        throw error;
-      }
-      // Ignore AbortError and other errors - allow page to load normally
-      // AbortError happens when navigation is cancelled, which is expected behavior
-      if (error instanceof Error && error.name !== "AbortError") {
-        console.error("Error in login route guard:", error);
-      }
-    }
-  },
+  // Removed beforeLoad - it was blocking navigation
+  // LoginPage component will handle redirects if user is already authenticated
 });
 
 // Set password route (requires authentication, for onboarding)
@@ -121,23 +60,16 @@ const setPasswordRoute = createRoute({
   component: SetPasswordPage,
   beforeLoad: async () => {
     try {
-      // Check authentication before allowing access
+      // Lightweight check: if onboarding is already complete, redirect to dashboard
+      // RequireAuth component handles auth gating
       const { supabase } = await import("./lib/supabase");
       const {
         data: { session },
-        error: sessionError,
       } = await supabase.auth.getSession();
 
-      // If no session or error, redirect to login
-      if (sessionError || !session) {
-        throw redirect({
-          to: "/login",
-        });
-      }
-
-      // If onboarding is already complete, redirect to app
+      // If onboarding is already complete, redirect to dashboard
       // This prevents users from revisiting the onboarding page
-      if (session.user) {
+      if (session?.user) {
         try {
           const { data: profile, error: profileError } = await supabase
             .from("profiles")
@@ -214,45 +146,17 @@ const userDashboardRoute = createRoute({
       lng: search.lng ? Number(search.lng) : undefined,
     };
   },
-  beforeLoad: async () => {
-    // Check authentication before allowing access
-    // Auth is already resolved (router is gated), so this check is fast
-    const { supabase } = await import("./lib/supabase");
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    // If no session, redirect to login
-    if (!session) {
-      throw redirect({
-        to: "/login",
-      });
-    }
-  },
+  // No beforeLoad guard - ProtectedRoute component handles auth gating
+  // This allows the router to render immediately, improving UX
 });
 
 // Protected profile route (requires authentication) - shows profile info
-// NOTE: Auth is already resolved when this guard runs (router is gated behind auth loading)
-// This guard can safely check session - it will be fast since auth is in memory
+// RequireAuth component handles auth gating - no beforeLoad needed
 const profileRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profile",
   component: ProfilePage,
-  beforeLoad: async () => {
-    // Check authentication before allowing access
-    // Auth is already resolved (router is gated), so this check is fast
-    const { supabase } = await import("./lib/supabase");
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    // If no session, redirect to login
-    if (!session) {
-      throw redirect({
-        to: "/login",
-      });
-    }
-  },
+  // No beforeLoad - RequireAuth component handles auth
 });
 
 const routeTree = rootRoute.addChildren([
@@ -266,25 +170,32 @@ const routeTree = rootRoute.addChildren([
   profileRoute,
 ]);
 
-export const router = createRouter({ routeTree });
+export const router = createRouter({ 
+  routeTree,
+  // Ensure router works properly with browser history
+  defaultPreload: false,
+});
 
 function RootLayout() {
   const currentYear = new Date().getFullYear();
   // Use auth context to show/hide navigation items
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  // Use router state to ensure re-renders on route changes
+  const routerState = useRouterState();
 
   const handleSignOut = async () => {
     try {
       // Sign out and wait for it to complete
-      // The signOut function now properly awaits Supabase signOut and sets loading state
-      // This ensures the SIGNED_OUT event fires and auth state stabilizes before navigation
+      // The signOut function properly clears state and awaits Supabase signOut
       await signOut();
       
-      // Use requestAnimationFrame to ensure DOM is ready for navigation
-      // This prevents the router from updating the URL but not re-rendering
-      requestAnimationFrame(() => {
-        navigate({ to: "/login", replace: true });
+      // Navigate to login after sign out
+      // Auth state will update via SIGNED_OUT event
+      navigate({ 
+        to: "/login", 
+        search: {},
+        replace: true 
       });
     } catch (error: any) {
       // Even if signOut fails, navigate to login
@@ -292,9 +203,11 @@ function RootLayout() {
       if (error?.name !== "AbortError") {
         console.error("Error during sign out:", error);
       }
-      // Still navigate even on error, using requestAnimationFrame for consistency
-      requestAnimationFrame(() => {
-        navigate({ to: "/login", replace: true });
+      // Still navigate even on error
+      navigate({ 
+        to: "/login", 
+        search: {},
+        replace: true 
       });
     }
   };
@@ -338,6 +251,7 @@ function RootLayout() {
             ) : (
               <Link
                 to="/login"
+                search={{}}
                 className="text-sm text-text/70 transition-colors hover:text-accent"
               >
                 Sign In
@@ -347,7 +261,7 @@ function RootLayout() {
         </div>
       </nav>
       <main className="flex-1">
-        <Outlet />
+        <Outlet key={`${routerState.location.pathname}-${routerState.location.searchStr}-${routerState.location.hash}`} />
       </main>
       <footer className="border-t border-surface/60 bg-surface/20 py-8">
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-center gap-4 px-6 text-sm text-text/60 md:flex-row">

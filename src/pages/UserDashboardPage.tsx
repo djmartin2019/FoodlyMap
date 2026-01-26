@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import { useSearch } from "@tanstack/react-router";
 import DashboardMap, { MapMode, Place } from "../components/DashboardMap";
 import PlaceNameForm from "../components/PlaceNameForm";
 import LocationsTable, { Location } from "../components/LocationsTable";
+import { RequireAuth } from "../components/ProtectedRoute";
 
 interface Category {
   id: string;
@@ -26,35 +27,69 @@ export default function UserDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [highlightedLocationId, setHighlightedLocationId] = useState<string | null>(null);
 
-  // Load categories on mount
-  useEffect(() => {
-    const loadCategories = async () => {
-      if (!user) return;
+  // Load categories when user becomes available
+  // Memoized to prevent unnecessary re-fetches
+  const loadCategories = useCallback(async () => {
+    if (!user) {
+      setCategories([]);
+      return;
+    }
 
-      try {
-        const { data, error: fetchError } = await supabase
-          .from("categories")
-          .select("id, name")
-          .eq("user_id", user.id)
-          .order("name");
-
-        if (fetchError) {
-          console.error("Error fetching categories:", fetchError);
-          return;
+    try {
+      // Try cache first
+      const cacheKey = `foodly_categories_${user.id}`;
+      const cachedData = localStorage.getItem(cacheKey);
+      if (cachedData) {
+        try {
+          const parsed = JSON.parse(cachedData);
+          const cacheTime = parsed.timestamp || 0;
+          const now = Date.now();
+          // Use cache if less than 5 minutes old
+          if (now - cacheTime < 5 * 60 * 1000) {
+            setCategories(parsed.categories || []);
+            // Still fetch fresh data in background
+          }
+        } catch (e) {
+          // Invalid cache, continue to fetch
         }
-
-        setCategories(data || []);
-      } catch (err) {
-        console.error("Unexpected error loading categories:", err);
       }
-    };
 
-    loadCategories();
+      const { data, error: fetchError } = await supabase
+        .from("categories")
+        .select("id, name")
+        .eq("user_id", user.id)
+        .order("name");
+
+      if (fetchError) {
+        console.error("Error fetching categories:", fetchError);
+        return;
+      }
+
+      const categoriesData = data || [];
+      setCategories(categoriesData);
+      
+      // Cache the data
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify({
+          categories: categoriesData,
+          timestamp: Date.now(),
+        }));
+      } catch (e) {
+        // localStorage might be full or disabled, ignore
+      }
+    } catch (err) {
+      console.error("Unexpected error loading categories:", err);
+    }
   }, [user]);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
 
   // Refactored loadLocations to be reusable
   // setLoadingState: if true, will set loading state (for initial load), if false, won't (for background refresh)
-  const loadLocations = async (setLoadingState: boolean = false) => {
+  // Memoized with useCallback to prevent unnecessary re-renders and ensure stable reference
+  const loadLocations = useCallback(async (setLoadingState: boolean = false) => {
     if (!user) {
       if (setLoadingState) setLoading(false);
       return;
@@ -63,6 +98,26 @@ export default function UserDashboardPage() {
     if (setLoadingState) setLoading(true);
 
     try {
+      // Try to load from cache first for faster initial render
+      const cacheKey = `foodly_locations_${user.id}`;
+      const cachedData = localStorage.getItem(cacheKey);
+      if (cachedData && setLoadingState) {
+        try {
+          const parsed = JSON.parse(cachedData);
+          const cacheTime = parsed.timestamp || 0;
+          const now = Date.now();
+          // Use cache if less than 5 minutes old
+          if (now - cacheTime < 5 * 60 * 1000) {
+            setLocations(parsed.locations || []);
+            setPlaces(parsed.places || []);
+            setLoading(false);
+            // Still fetch fresh data in background
+          }
+        } catch (e) {
+          // Invalid cache, continue to fetch
+        }
+      }
+
       // Fetch places linked to this user via user_places junction table
       // Include category_id and created_at for table view
       // Also fetch category name if category_id exists
@@ -118,6 +173,18 @@ export default function UserDashboardPage() {
 
       setLocations(userLocations);
       setPlaces(userPlaces);
+      
+      // Cache the data for faster reloads
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify({
+          locations: userLocations,
+          places: userPlaces,
+          timestamp: Date.now(),
+        }));
+      } catch (e) {
+        // localStorage might be full or disabled, ignore
+      }
+      
       if (setLoadingState) setLoading(false);
     } catch (err) {
       console.error("Unexpected error loading places:", err);
@@ -126,12 +193,19 @@ export default function UserDashboardPage() {
         setLoading(false);
       }
     }
-  };
-
-  // Load user's locations (places) on mount
-  useEffect(() => {
-    loadLocations(true); // Set loading state for initial load
   }, [user]);
+
+  // Load user's locations (places) when user becomes available
+  useEffect(() => {
+    if (user) {
+      loadLocations(true); // Set loading state for initial load
+    } else {
+      // Clear data if user logs out
+      setLocations([]);
+      setPlaces([]);
+      setLoading(false);
+    }
+  }, [user, loadLocations]);
 
   // Handle URL search params for view-on-map
   useEffect(() => {
@@ -178,6 +252,15 @@ export default function UserDashboardPage() {
   const handleCategoryCreated = (category: Category) => {
     // Add new category to local state
     setCategories((prev) => [...prev, category].sort((a, b) => a.name.localeCompare(b.name)));
+    
+    // Invalidate category cache
+    if (user) {
+      try {
+        localStorage.removeItem(`foodly_categories_${user.id}`);
+      } catch (e) {
+        // Ignore cache errors
+      }
+    }
   };
 
   // Handle form submission - save place
@@ -192,16 +275,30 @@ export default function UserDashboardPage() {
 
     try {
       // Insert place into places table
+      // Ensure category_id is null if empty string or null
+      const placeDataToInsert: {
+        name: string;
+        latitude: number;
+        longitude: number;
+        category_id?: string | null;
+      } = {
+        name,
+        latitude: pendingCoordinates.lat,
+        longitude: pendingCoordinates.lng,
+      };
+      
+      // Only include category_id if it has a value
+      if (categoryId && categoryId.trim() !== "") {
+        placeDataToInsert.category_id = categoryId;
+      } else {
+        placeDataToInsert.category_id = null;
+      }
+
+      console.log("Inserting place with data:", placeDataToInsert);
+      
       const { data: placeData, error: placeError } = await supabase
         .from("places")
-        .insert([
-          {
-            name,
-            latitude: pendingCoordinates.lat,
-            longitude: pendingCoordinates.lng,
-            category_id: categoryId,
-          },
-        ])
+        .insert([placeDataToInsert])
         .select()
         .single();
 
@@ -211,6 +308,8 @@ export default function UserDashboardPage() {
         setSaving(false);
         return;
       }
+
+      console.log("Place created successfully:", placeData);
 
       // Link place to user via user_places junction table
       const { error: linkError } = await supabase
@@ -251,6 +350,16 @@ export default function UserDashboardPage() {
 
       setPlaces([...places, newPlace]);
       setLocations([newLocation, ...locations]);
+      
+      // Invalidate cache
+      if (user) {
+        try {
+          localStorage.removeItem(`foodly_locations_${user.id}`);
+        } catch (e) {
+          // Ignore cache errors
+        }
+      }
+      
       setMode("VIEW");
       setPendingCoordinates(null);
       setShowForm(false);
@@ -277,18 +386,56 @@ export default function UserDashboardPage() {
 
     try {
       // Update the place record
-      const { error: updateError } = await supabase
+      // Ensure category_id is null if empty string or null
+      const updateData: {
+        name: string;
+        category_id: string | null;
+      } = {
+        name,
+        category_id: (categoryId && categoryId.trim() !== "") ? categoryId : null,
+      };
+
+      console.log("Updating place with data:", updateData);
+      console.log("Location ID:", locationId);
+      console.log("User ID:", user.id);
+      
+      // First, verify the user has access to this place via user_places
+      const { data: userPlaceCheck, error: checkError } = await supabase
+        .from("user_places")
+        .select("place_id")
+        .eq("user_id", user.id)
+        .eq("place_id", locationId)
+        .single();
+      
+      if (checkError || !userPlaceCheck) {
+        console.error("User does not have access to this place:", checkError);
+        throw new Error("You do not have permission to update this location");
+      }
+      
+      // Update the place record
+      const { data: updateResult, error: updateError } = await supabase
         .from("places")
-        .update({
-          name,
-          category_id: categoryId,
-        })
-        .eq("id", locationId);
+        .update(updateData)
+        .eq("id", locationId)
+        .select();
 
       if (updateError) {
         console.error("Error updating place:", updateError);
+        console.error("Error code:", updateError.code);
+        console.error("Error details:", JSON.stringify(updateError, null, 2));
         throw new Error(updateError.message || "Failed to update location");
       }
+
+      console.log("Place updated successfully. Result:", updateResult);
+      
+      // Verify the update actually happened
+      if (!updateResult || updateResult.length === 0) {
+        console.warn("Update returned no rows - possible RLS issue or row not found");
+        console.warn("This usually means RLS policy is preventing the update");
+        throw new Error("Update did not affect any rows. Check RLS policies.");
+      }
+      
+      console.log("Updated place data:", updateResult[0]);
 
       // Optimistically update local state
       setLocations(prevLocations => 
@@ -313,6 +460,15 @@ export default function UserDashboardPage() {
             : place
         )
       );
+
+      // Invalidate cache
+      if (user) {
+        try {
+          localStorage.removeItem(`foodly_locations_${user.id}`);
+        } catch (e) {
+          // Ignore cache errors
+        }
+      }
 
       // Refetch in background to ensure consistency (don't await, don't set loading state)
       loadLocations(false).catch(err => {
@@ -348,6 +504,15 @@ export default function UserDashboardPage() {
       setLocations(locations.filter(loc => loc.id !== locationId));
       setPlaces(places.filter(place => place.id !== locationId));
 
+      // Invalidate cache
+      if (user) {
+        try {
+          localStorage.removeItem(`foodly_locations_${user.id}`);
+        } catch (e) {
+          // Ignore cache errors
+        }
+      }
+
       // Refetch in background to ensure consistency (don't await, don't set loading state)
       loadLocations(false).catch(err => {
         console.error("Error refetching locations after delete:", err);
@@ -362,7 +527,8 @@ export default function UserDashboardPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col px-4 py-6 sm:px-6 sm:py-8 md:px-8 md:py-12">
+    <RequireAuth>
+      <div className="mx-auto flex w-full max-w-6xl flex-col px-4 py-6 sm:px-6 sm:py-8 md:px-8 md:py-12">
       {/* Header - Mobile: Increased spacing for better vertical rhythm on iOS Safari */}
       <div className="mb-6 sm:mb-8">
         <h1 className="mb-3 text-3xl font-bold tracking-tight text-accent sm:mb-2 sm:text-4xl md:text-5xl">
@@ -497,6 +663,7 @@ export default function UserDashboardPage() {
           onViewOnMap={() => setViewMode("map")}
         />
       </div>
-    </div>
+      </div>
+    </RequireAuth>
   );
 }

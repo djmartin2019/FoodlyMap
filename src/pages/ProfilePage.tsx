@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
+import { RequireAuth } from "../components/ProtectedRoute";
 
 interface Profile {
   id: string;
@@ -18,39 +19,82 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch user profile on mount
-  useEffect(() => {
-    const fetchProfile = async () => {
-      if (!user) {
+  // Memoized fetch function to prevent unnecessary re-fetches
+  const fetchProfile = useCallback(async () => {
+    if (!user) {
+      setProfile(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Try to load from cache first for faster initial render
+      const cacheKey = `foodly_profile_${user.id}`;
+      const cachedData = localStorage.getItem(cacheKey);
+      if (cachedData) {
+        try {
+          const parsed = JSON.parse(cachedData);
+          const cacheTime = parsed.timestamp || 0;
+          const now = Date.now();
+          // Use cache if less than 5 minutes old
+          if (now - cacheTime < 5 * 60 * 1000) {
+            setProfile(parsed.profile);
+            setLoading(false);
+            // Still fetch fresh data in background
+          }
+        } catch (e) {
+          // Invalid cache, continue to fetch
+        }
+      }
+
+      const { data, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError) {
+        console.error("Error fetching profile:", profileError);
+        setError("Failed to load profile information");
         setLoading(false);
         return;
       }
 
+      setProfile(data);
+      
+      // Cache the data for faster reloads
       try {
-        const { data, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-
-        if (profileError) {
-          console.error("Error fetching profile:", profileError);
-          setError("Failed to load profile information");
-          setLoading(false);
-          return;
-        }
-
-        setProfile(data);
-        setLoading(false);
-      } catch (err) {
-        console.error("Unexpected error fetching profile:", err);
-        setError("An unexpected error occurred");
-        setLoading(false);
+        localStorage.setItem(cacheKey, JSON.stringify({
+          profile: data,
+          timestamp: Date.now(),
+        }));
+      } catch (e) {
+        // localStorage might be full or disabled, ignore
       }
-    };
-
-    fetchProfile();
+      
+      setLoading(false);
+    } catch (err) {
+      console.error("Unexpected error fetching profile:", err);
+      setError("An unexpected error occurred");
+      setLoading(false);
+    }
   }, [user]);
+
+  // Fetch profile when user becomes available
+  useEffect(() => {
+    if (user) {
+      fetchProfile();
+    } else {
+      // Clear profile if user logs out
+      setProfile(null);
+      setLoading(false);
+      setError(null);
+    }
+  }, [user, fetchProfile]);
 
   // Get display name (first name, or fallback to username or email)
   const getDisplayName = () => {
@@ -83,7 +127,8 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col px-6 py-12 md:px-8">
+    <RequireAuth>
+      <div className="mx-auto flex w-full max-w-6xl flex-col px-6 py-12 md:px-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="mb-2 text-4xl font-bold tracking-tight text-accent md:text-5xl">
@@ -143,6 +188,7 @@ export default function ProfilePage() {
           <p className="text-text/60">No profile information available.</p>
         )}
       </div>
-    </div>
+      </div>
+    </RequireAuth>
   );
 }

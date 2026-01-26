@@ -2,6 +2,7 @@ import { useState, FormEvent, useEffect, useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
+import { RequireAuth } from "../components/ProtectedRoute";
 
 interface FormErrors {
   username?: string;
@@ -26,29 +27,8 @@ export default function SetPasswordPage() {
   const [profileCreated, setProfileCreated] = useState(false);
   const [redirectCountdown, setRedirectCountdown] = useState(3);
 
-  // Check if user is authenticated on mount
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error("Session check error:", sessionError);
-        }
-        
-        if (!session) {
-          navigate({ to: "/login", replace: true });
-        }
-      } catch (error) {
-        console.error("Error checking session:", error);
-        // Don't navigate on error - let route guard handle it
-      }
-    };
-    checkSession();
-  }, [navigate]);
+  // ProtectedRoute handles auth checking and redirects
+  // No need for manual session check here
 
   // Validate username format
   const validateUsernameFormat = (value: string): boolean => {
@@ -364,8 +344,9 @@ export default function SetPasswordPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-200px)] w-full max-w-md items-center justify-center px-6 py-12">
-      <div className="w-full rounded-2xl border border-surface/60 bg-surface/30 p-8 shadow-neon-sm md:p-12">
+    <RequireAuth>
+      <div className="mx-auto flex min-h-[calc(100vh-200px)] w-full max-w-md items-center justify-center px-6 py-12">
+        <div className="w-full rounded-2xl border border-surface/60 bg-surface/30 p-8 shadow-neon-sm md:p-12">
         {profileCreated ? (
           <div className="text-center">
             <div className="mb-6">
@@ -540,7 +521,8 @@ export default function SetPasswordPage() {
             </form>
           </>
         )}
+        </div>
       </div>
-    </div>
+    </RequireAuth>
   );
 }
