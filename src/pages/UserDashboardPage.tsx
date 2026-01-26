@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import { useSearch } from "@tanstack/react-router";
@@ -207,6 +207,15 @@ export default function UserDashboardPage() {
     }
   }, [user, loadLocations]);
 
+  // Memoize centerOnLocation to prevent flyTo from retriggering on every render
+  // Only create object if we have valid coordinates
+  const centerOnLocation = useMemo(() => {
+    if (search?.lat && search?.lng) {
+      return { lat: search.lat, lng: search.lng };
+    }
+    return undefined;
+  }, [search?.lat, search?.lng]);
+
   // Handle URL search params for view-on-map
   useEffect(() => {
     if (search?.locationId && search.lat && search.lng) {
@@ -374,8 +383,9 @@ export default function UserDashboardPage() {
   // Handle form cancel
   const handleFormCancel = () => {
     setShowForm(false);
-    // Stay in ADD_PLACE mode so user can try again
-    // Keep pendingCoordinates so they can click "Place Here" again
+    setMode("VIEW");
+    setPendingCoordinates(null);
+    // Exit ADD_PLACE mode to restore normal marker view
   };
 
   // Handle update location
@@ -627,7 +637,7 @@ export default function UserDashboardPage() {
                 places={places}
                 hideTempMarker={showForm}
                 highlightedLocationId={highlightedLocationId}
-                centerOnLocation={search?.lat && search?.lng ? { lat: search.lat, lng: search.lng } : undefined}
+                centerOnLocation={centerOnLocation}
               />
               {/* Show form overlay when user clicks "Place Here" */}
               {showForm && pendingCoordinates && mode === "ADD_PLACE" && (

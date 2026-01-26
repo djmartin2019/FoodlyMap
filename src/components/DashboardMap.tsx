@@ -132,21 +132,38 @@ export default function DashboardMap({
       // Remove existing temporary marker if it exists
       tempMarkerRef.current?.remove();
       
-      // Create temporary marker element (ghost style)
-      const el = document.createElement("div");
-      el.className = "temp-place-marker";
-      el.style.width = "20px";
-      el.style.height = "20px";
-      el.style.borderRadius = "50%";
-      el.style.backgroundColor = "#39FF88";
-      el.style.border = "3px solid rgba(57, 255, 136, 0.8)";
-      el.style.boxShadow = "0 0 12px rgba(57, 255, 136, 0.6)";
-      el.style.cursor = "default";
-      el.style.position = "relative";
-      el.style.zIndex = "100"; // Lower z-index so form can appear above
+      // Create temporary marker with two-layer structure to prevent drift
+      // Outer wrapper: passed to Mapbox - MUST be minimal, Mapbox applies position/transform
+      const outerEl = document.createElement("div");
+      outerEl.style.width = "20px";
+      outerEl.style.height = "20px";
+      outerEl.style.display = "block";
+      // Prevent transitions that could interfere with Mapbox's transform updates
+      outerEl.style.transition = "none";
+      // NO position, transform, or willChange - Mapbox controls these
+      // Mapbox will apply position: absolute and transform: translate() itself
+      
+      // Inner element: all visual styling, fills outer element naturally
+      const innerEl = document.createElement("div");
+      innerEl.className = "temp-place-marker";
+      innerEl.style.width = "100%";
+      innerEl.style.height = "100%";
+      innerEl.style.borderRadius = "50%";
+      innerEl.style.backgroundColor = "#39FF88";
+      innerEl.style.border = "3px solid rgba(57, 255, 136, 0.8)";
+      innerEl.style.boxShadow = "0 0 12px rgba(57, 255, 136, 0.6)";
+      innerEl.style.cursor = "default";
+      // No position styles - just fills the outer element naturally
+      innerEl.style.zIndex = "100"; // Lower z-index so form can appear above
+      
+      outerEl.appendChild(innerEl);
       
       // Create temporary marker at map center
-      tempMarkerRef.current = new mapboxgl.Marker({ element: el })
+      // anchor: "center" ensures the marker is centered on the lat/lng point
+      tempMarkerRef.current = new mapboxgl.Marker({ 
+        element: outerEl,
+        anchor: "center"
+      })
         .setLngLat([center.lng, center.lat])
         .addTo(map);
       
@@ -191,16 +208,9 @@ export default function DashboardMap({
   }, [mode, onMapCenterChange, hideTempMarker]);
 
   // Render existing places as markers
+  // Keep markers visible in ADD_PLACE mode for better UX
   useEffect(() => {
-    if (!mapRef.current || mode === "ADD_PLACE") {
-      // Don't render existing places in ADD_PLACE mode
-      // Clear existing markers if switching to ADD_PLACE
-      if (mode === "ADD_PLACE") {
-        placeMarkersRef.current.forEach((marker) => marker.remove());
-        placeMarkersRef.current = [];
-        placePopupsRef.current.forEach((popup) => popup.remove());
-        placePopupsRef.current = [];
-      }
+    if (!mapRef.current) {
       return;
     }
 
@@ -226,28 +236,45 @@ export default function DashboardMap({
       places.forEach((place) => {
         const isHighlighted = highlightedLocationId === place.id;
         
-        // Create marker element with enhanced styling if highlighted
-        const el = document.createElement("div");
-        el.className = "place-marker";
+        // Create marker with two-layer structure to prevent drift
+        // Outer wrapper: passed to Mapbox - MUST be minimal, Mapbox applies position/transform
+        const outerEl = document.createElement("div");
+        const markerSize = isHighlighted ? "18px" : "12px";
+        outerEl.style.width = markerSize;
+        outerEl.style.height = markerSize;
+        outerEl.style.display = "block";
+        // Prevent transitions that could interfere with Mapbox's transform updates
+        outerEl.style.transition = "none";
+        // NO position, transform, or willChange - Mapbox controls these
+        // Mapbox will apply position: absolute and transform: translate() itself
+        
+        // Inner element: all visual styling, fills outer element naturally
+        const innerEl = document.createElement("div");
+        innerEl.className = "place-marker";
+        innerEl.style.width = "100%";
+        innerEl.style.height = "100%";
+        innerEl.style.borderRadius = "50%";
+        innerEl.style.backgroundColor = "#39FF88";
         if (isHighlighted) {
-          el.style.width = "18px";
-          el.style.height = "18px";
-          el.style.borderRadius = "50%";
-          el.style.backgroundColor = "#39FF88";
-          el.style.border = "3px solid rgba(57, 255, 136, 1)";
-          el.style.boxShadow = "0 0 16px rgba(57, 255, 136, 0.8)";
+          innerEl.style.border = "3px solid rgba(57, 255, 136, 1)";
+          innerEl.style.boxShadow = "0 0 16px rgba(57, 255, 136, 0.8)";
         } else {
-          el.style.width = "12px";
-          el.style.height = "12px";
-          el.style.borderRadius = "50%";
-          el.style.backgroundColor = "#39FF88";
-          el.style.border = "2px solid rgba(57, 255, 136, 0.6)";
-          el.style.boxShadow = "0 0 8px rgba(57, 255, 136, 0.5)";
+          innerEl.style.border = "2px solid rgba(57, 255, 136, 0.6)";
+          innerEl.style.boxShadow = "0 0 8px rgba(57, 255, 136, 0.5)";
         }
-        el.style.cursor = "pointer";
-        el.style.pointerEvents = "auto";
-        el.style.position = "relative";
-        el.style.zIndex = isHighlighted ? "2000" : "1000";
+        // In ADD_PLACE mode, make existing markers non-interactive to prevent accidental clicks
+        // The temp marker should be the focus, not existing places
+        if (mode === "ADD_PLACE") {
+          innerEl.style.cursor = "default";
+          innerEl.style.pointerEvents = "none";
+        } else {
+          innerEl.style.cursor = "pointer";
+          innerEl.style.pointerEvents = "auto";
+        }
+        // No position styles - just fills the outer element naturally
+        innerEl.style.zIndex = isHighlighted ? "2000" : "1000";
+        
+        outerEl.appendChild(innerEl);
 
         // Create popup with proper styling
         const popup = new mapboxgl.Popup({
@@ -258,17 +285,25 @@ export default function DashboardMap({
         })
           .setHTML(`<div class="text-sm font-semibold text-text">${place.name}</div>`);
 
-        // Create marker and attach popup directly
-        // This makes the popup show automatically on marker click
-        const marker = new mapboxgl.Marker({ element: el })
+        // Create marker with anchor center for proper positioning
+        const marker = new mapboxgl.Marker({ 
+          element: outerEl,
+          anchor: "center"
+        })
           .setLngLat([place.longitude, place.latitude])
-          .setPopup(popup) // Attach popup to marker
           .addTo(map);
+        
+        // Only attach popup in VIEW mode (not ADD_PLACE) to prevent interaction during place addition
+        if (mode !== "ADD_PLACE") {
+          marker.setPopup(popup);
+        }
 
         if (isHighlighted) {
           highlightedMarkerRef.current = marker;
-          // Open popup for highlighted location
-          popup.addTo(map);
+          // Open popup for highlighted location (only in VIEW mode)
+          if (mode !== "ADD_PLACE") {
+            popup.addTo(map);
+          }
         }
 
         placeMarkersRef.current.push(marker);
@@ -278,16 +313,39 @@ export default function DashboardMap({
   }, [places, mode, highlightedLocationId]);
 
   // Handle centering map on location from URL params
+  // Use ref to track previous coordinates to prevent repeated flyTo calls
+  const prevCenterRef = useRef<{ lat: number; lng: number } | null>(null);
+  
   useEffect(() => {
-    if (!mapRef.current || !centerOnLocation) return;
+    if (!mapRef.current || !centerOnLocation) {
+      prevCenterRef.current = null;
+      return;
+    }
+
+    // Don't flyTo during ADD_PLACE mode - it interferes with user interaction
+    if (mode === "ADD_PLACE") {
+      return;
+    }
+
+    // Only flyTo if coordinates actually changed
+    const prevCenter = prevCenterRef.current;
+    if (
+      prevCenter &&
+      prevCenter.lat === centerOnLocation.lat &&
+      prevCenter.lng === centerOnLocation.lng
+    ) {
+      return; // Coordinates haven't changed, skip flyTo
+    }
 
     const map = mapRef.current;
+    prevCenterRef.current = { lat: centerOnLocation.lat, lng: centerOnLocation.lng };
+    
     map.flyTo({
       center: [centerOnLocation.lng, centerOnLocation.lat],
       zoom: 14,
       duration: 1000,
     });
-  }, [centerOnLocation]);
+  }, [centerOnLocation, mode]);
 
   return (
     <div className="relative h-full w-full">
