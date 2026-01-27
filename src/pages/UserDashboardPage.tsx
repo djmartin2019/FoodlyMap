@@ -119,26 +119,28 @@ export default function UserDashboardPage() {
       }
 
       // Fetch places linked to this user via user_places junction table
-      // Include category_id and created_at for table view
+      // category_id is now on user_places, not places
       // Also fetch category name if category_id exists
       const { data, error: fetchError } = await supabase
         .from("user_places")
         .select(`
+          id,
+          category_id,
+          created_at,
           place:places (
             id,
             name,
             latitude,
             longitude,
-            category_id,
-            created_at,
-            category:categories (
-              id,
-              name
-            )
+            created_at
+          ),
+          category:categories (
+            id,
+            name
           )
         `)
         .eq("user_id", user.id)
-        .order("created_at", { foreignTable: "places", ascending: false });
+        .order("created_at", { ascending: false });
 
       if (fetchError) {
         console.error("Error fetching places:", fetchError);
@@ -150,17 +152,17 @@ export default function UserDashboardPage() {
       }
 
       // Transform the data for both Place interface (map) and Location interface (table)
+      // category_id is now on user_places, not places
       const userLocations: Location[] = (data || [])
-        .map((item: any) => item.place)
-        .filter((place: any) => place !== null)
-        .map((place: any) => ({
-          id: place.id,
-          name: place.name,
-          latitude: place.latitude,
-          longitude: place.longitude,
-          category_id: place.category_id || null,
-          category_name: place.category?.name || null,
-          created_at: place.created_at,
+        .filter((item: any) => item.place !== null)
+        .map((item: any) => ({
+          id: item.place.id,
+          name: item.place.name,
+          latitude: item.place.latitude,
+          longitude: item.place.longitude,
+          category_id: item.category_id || null,
+          category_name: item.category?.name || null,
+          created_at: item.created_at,
         }));
 
       // Also create Place array for map component
@@ -283,28 +285,13 @@ export default function UserDashboardPage() {
     setError(null);
 
     try {
-      // Insert place into places table
-      // Ensure category_id is null if empty string or null
-      const placeDataToInsert: {
-        name: string;
-        latitude: number;
-        longitude: number;
-        category_id?: string | null;
-      } = {
+      // Insert place into places table (no category_id - it's on user_places now)
+      const placeDataToInsert = {
         name,
         latitude: pendingCoordinates.lat,
         longitude: pendingCoordinates.lng,
       };
-      
-      // Only include category_id if it has a value
-      if (categoryId && categoryId.trim() !== "") {
-        placeDataToInsert.category_id = categoryId;
-      } else {
-        placeDataToInsert.category_id = null;
-      }
 
-      console.log("Inserting place with data:", placeDataToInsert);
-      
       const { data: placeData, error: placeError } = await supabase
         .from("places")
         .insert([placeDataToInsert])
@@ -318,17 +305,27 @@ export default function UserDashboardPage() {
         return;
       }
 
-      console.log("Place created successfully:", placeData);
-
       // Link place to user via user_places junction table
+      // category_id is now stored on user_places, not places
+      const userPlaceData: {
+        user_id: string;
+        place_id: string;
+        category_id?: string | null;
+      } = {
+        user_id: user.id,
+        place_id: placeData.id,
+      };
+      
+      // Only include category_id if it has a value
+      if (categoryId && categoryId.trim() !== "") {
+        userPlaceData.category_id = categoryId;
+      } else {
+        userPlaceData.category_id = null;
+      }
+
       const { error: linkError } = await supabase
         .from("user_places")
-        .insert([
-          {
-            user_id: user.id,
-            place_id: placeData.id,
-          },
-        ]);
+        .insert([userPlaceData]);
 
       if (linkError) {
         console.error("Error linking place to user:", linkError);
@@ -350,7 +347,7 @@ export default function UserDashboardPage() {
         name: placeData.name,
         latitude: placeData.latitude,
         longitude: placeData.longitude,
-        category_id: placeData.category_id || null,
+        category_id: categoryId && categoryId.trim() !== "" ? categoryId : null,
         category_name: categoryId 
           ? categories.find(c => c.id === categoryId)?.name || null
           : null,
@@ -395,24 +392,10 @@ export default function UserDashboardPage() {
     }
 
     try {
-      // Update the place record
-      // Ensure category_id is null if empty string or null
-      const updateData: {
-        name: string;
-        category_id: string | null;
-      } = {
-        name,
-        category_id: (categoryId && categoryId.trim() !== "") ? categoryId : null,
-      };
-
-      console.log("Updating place with data:", updateData);
-      console.log("Location ID:", locationId);
-      console.log("User ID:", user.id);
-      
       // First, verify the user has access to this place via user_places
       const { data: userPlaceCheck, error: checkError } = await supabase
         .from("user_places")
-        .select("place_id")
+        .select("id, place_id")
         .eq("user_id", user.id)
         .eq("place_id", locationId)
         .single();
@@ -421,31 +404,45 @@ export default function UserDashboardPage() {
         console.error("User does not have access to this place:", checkError);
         throw new Error("You do not have permission to update this location");
       }
-      
-      // Update the place record
-      const { data: updateResult, error: updateError } = await supabase
+
+      // Update the place name (places table)
+      const placeUpdateData = { name };
+      const { error: placeUpdateError } = await supabase
         .from("places")
-        .update(updateData)
-        .eq("id", locationId)
+        .update(placeUpdateData)
+        .eq("id", locationId);
+
+      if (placeUpdateError) {
+        console.error("Error updating place name:", placeUpdateError);
+        throw new Error(placeUpdateError.message || "Failed to update place name");
+      }
+
+      // Update category_id on user_places (not places)
+      // Normalize categoryId: empty string or null becomes null
+      const categoryIdToSet = (categoryId && categoryId.trim() !== "") ? categoryId.trim() : null;
+      
+      // Build update data - always include category_id (even if null) to ensure it's set
+      const userPlaceUpdateData: { category_id: string | null } = {
+        category_id: categoryIdToSet,
+      };
+
+      // Update using user_id and place_id together (more reliable with RLS)
+      // This ensures RLS policies that check user_id will allow the update
+      const { data: updatedUserPlaces, error: userPlaceUpdateError } = await supabase
+        .from("user_places")
+        .update(userPlaceUpdateData)
+        .eq("user_id", user.id)
+        .eq("place_id", locationId)
         .select();
 
-      if (updateError) {
-        console.error("Error updating place:", updateError);
-        console.error("Error code:", updateError.code);
-        console.error("Error details:", JSON.stringify(updateError, null, 2));
-        throw new Error(updateError.message || "Failed to update location");
+      if (userPlaceUpdateError) {
+        console.error("Error updating user_places category:", userPlaceUpdateError);
+        throw new Error(userPlaceUpdateError.message || "Failed to update category");
       }
 
-      console.log("Place updated successfully. Result:", updateResult);
-      
-      // Verify the update actually happened
-      if (!updateResult || updateResult.length === 0) {
-        console.warn("Update returned no rows - possible RLS issue or row not found");
-        console.warn("This usually means RLS policy is preventing the update");
-        throw new Error("Update did not affect any rows. Check RLS policies.");
+      if (!updatedUserPlaces || updatedUserPlaces.length === 0) {
+        throw new Error("Update did not affect any rows. Check RLS policies on user_places table.");
       }
-      
-      console.log("Updated place data:", updateResult[0]);
 
       // Optimistically update local state
       setLocations(prevLocations => 
