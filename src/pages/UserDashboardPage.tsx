@@ -246,11 +246,12 @@ export default function UserDashboardPage() {
   };
 
   // Handle map center change in ADD_PLACE mode
-  const handleMapCenterChange = (lng: number, lat: number) => {
+  // Memoized to prevent infinite loops in DashboardMap useEffect
+  const handleMapCenterChange = useCallback((lng: number, lat: number) => {
     if (mode === "ADD_PLACE") {
       setPendingCoordinates({ lng, lat });
     }
-  };
+  }, [mode]);
 
   // Handle "Place Here" click - show form
   const handlePlaceHere = () => {

@@ -120,31 +120,17 @@ function RootLayout() {
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
-    try {
-      // Sign out and wait for it to complete
-      // The signOut function properly clears state and awaits Supabase signOut
-      await signOut();
-      
-      // Navigate to login after sign out
-      // Auth state will update via SIGNED_OUT event
-      navigate({ 
-        to: "/login", 
-        search: {},
-        replace: true 
-      });
-    } catch (error: any) {
-      // Even if signOut fails, navigate to login
-      // AbortError is common when navigation happens - ignore it
-      if (error?.name !== "AbortError") {
-        console.error("Error during sign out:", error);
-      }
-      // Still navigate even on error
-      navigate({ 
-        to: "/login", 
-        search: {},
-        replace: true 
-      });
-    }
+    // signOut now handles all errors internally and never throws
+    // It will clear local state and attempt remote logout if session exists
+    await signOut();
+    
+    // Always navigate to login after sign out
+    // Auth state is already cleared by signOut
+    navigate({ 
+      to: "/login", 
+      search: {},
+      replace: true 
+    });
   };
 
   return (

@@ -166,11 +166,6 @@ export default function DashboardMap({
       })
         .setLngLat([center.lng, center.lat])
         .addTo(map);
-      
-      // Initial update of parent state with current center
-      if (onMapCenterChange) {
-        onMapCenterChange(center.lng, center.lat);
-      }
 
       // Update marker position visually during move (no state update)
       const updateMarkerPosition = () => {
@@ -181,6 +176,7 @@ export default function DashboardMap({
       };
 
       // Update parent state only when movement ends (to avoid excessive re-renders)
+      // Don't call on initial mount - only on actual map movement
       const updateParentState = () => {
         if (mode === "ADD_PLACE" && !hideTempMarker && onMapCenterChange) {
           const newCenter = map.getCenter();

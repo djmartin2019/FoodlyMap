@@ -51,15 +51,10 @@ export default function DashboardPage() {
   }, [user, navigate]);
 
   const handleSignOut = async () => {
-    try {
-      await signOut();
-      // Use hard redirect to ensure all state is cleared
-      window.location.href = "/login";
-    } catch (error) {
-      console.error("Error during sign out:", error);
-      // Even if signOut fails, try to redirect
-      window.location.href = "/login";
-    }
+    // signOut now handles all errors internally and never throws
+    await signOut();
+    // Use hard redirect to ensure all state is cleared
+    window.location.href = "/login";
   };
 
   if (loading) {

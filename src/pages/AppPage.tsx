@@ -56,17 +56,10 @@ export default function AppPage() {
   }, [user]);
 
   const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch (error: any) {
-      // AbortError is common when navigation happens - ignore it
-      if (error?.name !== "AbortError") {
-        console.error("Error during sign out:", error);
-      }
-    } finally {
-      // Always navigate, even if signOut fails or is aborted
-      navigate({ to: "/login", replace: true });
-    }
+    // signOut now handles all errors internally and never throws
+    await signOut();
+    // Always navigate after sign out
+    navigate({ to: "/login", replace: true });
   };
 
   // Get display name (first name, or fallback to username or email)
