@@ -132,7 +132,8 @@ export default function UserDashboardPage() {
             name,
             latitude,
             longitude,
-            created_at
+            created_at,
+            display_address
           ),
           category:categories (
             id,
@@ -165,13 +166,17 @@ export default function UserDashboardPage() {
           created_at: item.created_at,
         }));
 
-      // Also create Place array for map component
-      const userPlaces: Place[] = userLocations.map((loc) => ({
-        id: loc.id,
-        name: loc.name,
-        latitude: loc.latitude,
-        longitude: loc.longitude,
-      }));
+      // Also create Place array for map component (include address and category for popup)
+      const userPlaces: Place[] = (data || [])
+        .filter((item: any) => item.place !== null)
+        .map((item: any) => ({
+          id: item.place.id,
+          name: item.place.name,
+          latitude: item.place.latitude,
+          longitude: item.place.longitude,
+          display_address: item.place.display_address || null,
+          category_name: item.category?.name || null,
+        }));
 
       setLocations(userLocations);
       setPlaces(userPlaces);
@@ -275,8 +280,68 @@ export default function UserDashboardPage() {
     }
   };
 
-  // Handle form submission - save place
-  const handleSavePlace = async (name: string, categoryId: string | null) => {
+  // TypeScript type for place insert payload (excludes generated columns)
+  type PlaceInsert = {
+    name: string;
+    latitude: number;
+    longitude: number;
+    display_address?: string | null;
+    address_line1?: string | null;
+    city?: string | null;
+    region?: string | null;
+    postal_code?: string | null;
+    country?: string | null;
+    mapbox_place_id?: string | null;
+    geocoded_at?: string | null;
+    created_by?: string | null;
+  };
+
+  // Helper function to create a sanitized place insert payload
+  // Removes generated columns (name_norm, lat_round, lng_round) and read-only columns (id, created_at)
+  const toPlaceInsert = (data: {
+    name: string;
+    latitude: number;
+    longitude: number;
+    display_address?: string | null;
+    address_line1?: string | null;
+    city?: string | null;
+    region?: string | null;
+    postal_code?: string | null;
+    country?: string | null;
+    mapbox_place_id?: string | null;
+    geocoded_at?: string | null;
+    created_by?: string | null;
+  }): PlaceInsert => {
+    return {
+      name: data.name,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      display_address: data.display_address ?? null,
+      address_line1: data.address_line1 ?? null,
+      city: data.city ?? null,
+      region: data.region ?? null,
+      postal_code: data.postal_code ?? null,
+      country: data.country ?? null,
+      mapbox_place_id: data.mapbox_place_id ?? null,
+      geocoded_at: data.geocoded_at ?? null,
+      created_by: data.created_by ?? null,
+    };
+  };
+
+  // Handle form submission - save place with Mapbox Place ID deduplication
+  const handleSavePlace = async (
+    name: string,
+    categoryId: string | null,
+    geocodedAddress: {
+      display_address: string;
+      address_line1: string | null;
+      city: string | null;
+      region: string | null;
+      postal_code: string | null;
+      country: string | null;
+      mapbox_place_id: string;
+    } | null
+  ) => {
     if (!user || !pendingCoordinates) {
       setError("Missing user or coordinates");
       return;
@@ -286,53 +351,153 @@ export default function UserDashboardPage() {
     setError(null);
 
     try {
-      // Insert place into places table (no category_id - it's on user_places now)
-      const placeDataToInsert = {
-        name,
-        latitude: pendingCoordinates.lat,
-        longitude: pendingCoordinates.lng,
-      };
+      let placeId: string;
+      let placeData: any;
 
-      const { data: placeData, error: placeError } = await supabase
-        .from("places")
-        .insert([placeDataToInsert])
-        .select()
-        .single();
+      // Step 1: Check if we have a mapbox_place_id for deduplication
+      if (geocodedAddress?.mapbox_place_id) {
+        // Check if a place with this mapbox_place_id already exists
+        const { data: existingPlace, error: lookupError } = await supabase
+          .from("places")
+          .select("id, name, latitude, longitude, display_address, created_at")
+          .eq("mapbox_place_id", geocodedAddress.mapbox_place_id)
+          .maybeSingle();
 
-      if (placeError) {
-        console.error("Error creating place:", placeError);
+        if (existingPlace && !lookupError) {
+          // Reuse existing place
+          placeId = existingPlace.id;
+          placeData = existingPlace;
+        } else {
+          // Place doesn't exist, insert new one
+          // Use helper to create sanitized insert payload (excludes generated columns)
+          const placeDataToInsert = toPlaceInsert({
+            name,
+            latitude: pendingCoordinates.lat,
+            longitude: pendingCoordinates.lng,
+            display_address: geocodedAddress.display_address,
+            address_line1: geocodedAddress.address_line1,
+            city: geocodedAddress.city,
+            region: geocodedAddress.region,
+            postal_code: geocodedAddress.postal_code,
+            country: geocodedAddress.country,
+            mapbox_place_id: geocodedAddress.mapbox_place_id,
+            geocoded_at: new Date().toISOString(),
+            created_by: user.id,
+          });
+
+          const { data: newPlaceData, error: insertError } = await supabase
+            .from("places")
+            .insert([placeDataToInsert])
+            .select()
+            .single();
+
+          if (insertError) {
+            // Handle race condition: if unique constraint violation, try to find existing place
+            if (insertError.code === "23505" || insertError.message?.includes("unique")) {
+              const { data: racePlace, error: raceError } = await supabase
+                .from("places")
+                .select("id, name, latitude, longitude, display_address, created_at")
+                .eq("mapbox_place_id", geocodedAddress.mapbox_place_id)
+                .maybeSingle();
+
+              if (racePlace && !raceError) {
+                // Reuse the place that was created by another request
+                placeId = racePlace.id;
+                placeData = racePlace;
+              } else {
+                console.error("Error finding place after race condition:", raceError);
+                setError("Failed to save place. Please try again.");
+                setSaving(false);
+                return;
+              }
+            } else {
+              // Log the full error for debugging
+              console.error("Error creating place:", insertError);
+              console.error("Place data attempted:", placeDataToInsert);
+              setError(`Failed to save place: ${insertError.message || "Unknown error"}`);
+              setSaving(false);
+              return;
+            }
+          } else {
+            placeId = newPlaceData.id;
+            placeData = newPlaceData;
+          }
+        }
+      } else {
+        // No mapbox_place_id - insert new place without deduplication
+        // Use helper to create sanitized insert payload (excludes generated columns)
+        const placeDataToInsert = toPlaceInsert({
+          name,
+          latitude: pendingCoordinates.lat,
+          longitude: pendingCoordinates.lng,
+          created_by: user.id,
+        });
+
+        const { data: newPlaceData, error: insertError } = await supabase
+          .from("places")
+          .insert([placeDataToInsert])
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("Error creating place:", insertError);
+          setError("Failed to save place. Please try again.");
+          setSaving(false);
+          return;
+        }
+
+        placeId = newPlaceData.id;
+        placeData = newPlaceData;
+      }
+
+      // Step 2: Check if user_places link already exists (prevent duplicates)
+      const { data: existingUserPlace, error: checkError } = await supabase
+        .from("user_places")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("place_id", placeId)
+        .maybeSingle();
+
+      if (checkError && checkError.code !== "PGRST116") {
+        console.error("Error checking user_places:", checkError);
         setError("Failed to save place. Please try again.");
         setSaving(false);
         return;
       }
 
-      // Link place to user via user_places junction table
-      // category_id is now stored on user_places, not places
-      const userPlaceData: {
-        user_id: string;
-        place_id: string;
-        category_id?: string | null;
-      } = {
-        user_id: user.id,
-        place_id: placeData.id,
-      };
-      
-      // Only include category_id if it has a value
-      if (categoryId && categoryId.trim() !== "") {
-        userPlaceData.category_id = categoryId;
-      } else {
-        userPlaceData.category_id = null;
-      }
+      // Only insert into user_places if it doesn't already exist
+      if (!existingUserPlace) {
+        const userPlaceData: {
+          user_id: string;
+          place_id: string;
+          category_id?: string | null;
+        } = {
+          user_id: user.id,
+          place_id: placeId,
+        };
+        
+        // Only include category_id if it has a value
+        if (categoryId && categoryId.trim() !== "") {
+          userPlaceData.category_id = categoryId;
+        } else {
+          userPlaceData.category_id = null;
+        }
 
-      const { error: linkError } = await supabase
-        .from("user_places")
-        .insert([userPlaceData]);
+        const { error: linkError } = await supabase
+          .from("user_places")
+          .insert([userPlaceData]);
 
-      if (linkError) {
-        console.error("Error linking place to user:", linkError);
-        setError("Failed to link place to your account. Please try again.");
-        setSaving(false);
-        return;
+        if (linkError) {
+          // Handle duplicate user_places gracefully (user might have already saved this place)
+          if (linkError.code === "23505" || linkError.message?.includes("unique")) {
+            // Already exists - that's fine, continue
+          } else {
+            console.error("Error linking place to user:", linkError);
+            setError("Failed to link place to your account. Please try again.");
+            setSaving(false);
+            return;
+          }
+        }
       }
 
       // Success: Add new place to local state
@@ -341,6 +506,10 @@ export default function UserDashboardPage() {
         name: placeData.name,
         latitude: placeData.latitude,
         longitude: placeData.longitude,
+        display_address: placeData.display_address || null,
+        category_name: categoryId 
+          ? categories.find(c => c.id === categoryId)?.name || null
+          : null,
       };
 
       const newLocation: Location = {
@@ -645,6 +814,7 @@ export default function UserDashboardPage() {
                   loading={saving}
                   categories={categories}
                   onCategoryCreated={handleCategoryCreated}
+                  coordinates={pendingCoordinates ? { lat: pendingCoordinates.lat, lng: pendingCoordinates.lng } : null}
                 />
               )}
             </>

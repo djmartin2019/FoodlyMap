@@ -8,6 +8,8 @@ export interface Place {
   name: string;
   latitude: number;
   longitude: number;
+  display_address?: string | null;
+  category_name?: string | null;
 }
 
 interface DashboardMapProps {
@@ -272,14 +274,22 @@ export default function DashboardMap({
         
         outerEl.appendChild(innerEl);
 
-        // Create popup with proper styling
+        // Create popup with proper styling - include name, address, and category
+        // Use inline styles since Tailwind classes don't work in setHTML
+        const popupContent = `
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <div style="font-size: 14px; font-weight: 600; color: #e9fff2;">${place.name}</div>
+            ${place.display_address ? `<div style="font-size: 12px; color: rgba(233, 255, 242, 0.7);">${place.display_address}</div>` : ''}
+            ${place.category_name ? `<div style="font-size: 12px; color: rgba(57, 255, 136, 0.8);">${place.category_name}</div>` : ''}
+          </div>
+        `;
         const popup = new mapboxgl.Popup({
           closeButton: false,
           closeOnClick: true,
           className: "place-popup",
           offset: isHighlighted ? 30 : 25, // Offset popup above marker
         })
-          .setHTML(`<div class="text-sm font-semibold text-text">${place.name}</div>`);
+          .setHTML(popupContent);
 
         // Create marker with anchor center for proper positioning
         const marker = new mapboxgl.Marker({ 

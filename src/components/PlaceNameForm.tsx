@@ -1,17 +1,29 @@
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, useEffect, useRef } from "react";
 import CategorySelect from "./CategorySelect";
+import { reverseGeocode } from "../lib/mapbox";
 
 interface Category {
   id: string;
   name: string;
 }
 
+export interface GeocodedAddress {
+  display_address: string;
+  address_line1: string | null;
+  city: string | null;
+  region: string | null;
+  postal_code: string | null;
+  country: string | null;
+  mapbox_place_id: string;
+}
+
 interface PlaceNameFormProps {
-  onSubmit: (name: string, categoryId: string | null) => void;
+  onSubmit: (name: string, categoryId: string | null, geocodedAddress: GeocodedAddress | null) => void;
   onCancel: () => void;
   loading?: boolean;
   categories: Category[];
   onCategoryCreated?: (category: Category) => void;
+  coordinates?: { lat: number; lng: number } | null;
 }
 
 /**
@@ -26,10 +38,56 @@ export default function PlaceNameForm({
   loading = false,
   categories,
   onCategoryCreated,
+  coordinates,
 }: PlaceNameFormProps) {
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [geocodedAddress, setGeocodedAddress] = useState<GeocodedAddress | null>(null);
+  const [geocoding, setGeocoding] = useState(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Reverse geocode when coordinates are available
+  useEffect(() => {
+    if (!coordinates) {
+      setGeocodedAddress(null);
+      return;
+    }
+
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Debounce geocoding (300ms)
+    setGeocoding(true);
+    debounceTimerRef.current = setTimeout(async () => {
+      const result = await reverseGeocode({
+        latitude: coordinates.lat,
+        longitude: coordinates.lng,
+      });
+      setGeocodedAddress(result);
+      setGeocoding(false);
+    }, 300);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [coordinates]);
+
+  // Handle re-detect address
+  const handleRedetectAddress = async () => {
+    if (!coordinates) return;
+    setGeocoding(true);
+    const result = await reverseGeocode({
+      latitude: coordinates.lat,
+      longitude: coordinates.lng,
+    });
+    setGeocodedAddress(result);
+    setGeocoding(false);
+  };
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -46,7 +104,7 @@ export default function PlaceNameForm({
       return;
     }
 
-    onSubmit(trimmedName, categoryId);
+    onSubmit(trimmedName, categoryId, geocodedAddress);
   };
 
   return (
@@ -77,6 +135,28 @@ export default function PlaceNameForm({
               <p className="mt-2 text-sm text-red-400">{error}</p>
             )}
           </div>
+
+          {/* Geocoded address preview */}
+          {coordinates && (
+            <div className="mb-4">
+              {geocoding ? (
+                <div className="text-xs text-text/50">Detecting address...</div>
+              ) : geocodedAddress ? (
+                <div className="space-y-1">
+                  <div className="text-xs text-text/50">Detected address:</div>
+                  <div className="text-sm text-text/80">{geocodedAddress.display_address}</div>
+                  <button
+                    type="button"
+                    onClick={handleRedetectAddress}
+                    className="text-xs text-accent/70 hover:text-accent transition-colors"
+                    disabled={geocoding}
+                  >
+                    Re-detect
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          )}
 
           <div className="mb-4">
             <label htmlFor="place-category" className="mb-2 block text-sm font-medium text-text/70">
