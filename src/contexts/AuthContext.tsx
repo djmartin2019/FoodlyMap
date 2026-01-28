@@ -113,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (!isExpired) {
               try {
                 // Use local scope - signs out current device only
-                const { error } = await supabase.auth.signOut({ scope: "local" });
+                await supabase.auth.signOut({ scope: "local" });
                 // Silently ignore errors - we've already cleared local state
                 // Common errors: 403 (session invalid), AuthSessionMissingError
               } catch (err: any) {
