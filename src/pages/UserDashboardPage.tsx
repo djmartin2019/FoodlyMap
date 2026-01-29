@@ -26,6 +26,10 @@ export default function UserDashboardPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [highlightedLocationId, setHighlightedLocationId] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; accuracy?: number; timestamp?: number } | null>(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [centerOnUserLocation, setCenterOnUserLocation] = useState(false);
 
   // Load categories when user becomes available
   // Memoized to prevent unnecessary re-fetches
@@ -658,6 +662,62 @@ export default function UserDashboardPage() {
     }
   };
 
+  // Handle "Center on me" / get current location
+  const handleCenterOnMe = () => {
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by your browser.");
+      return;
+    }
+
+    setLocationLoading(true);
+    setLocationError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        const newLocation = {
+          lat: latitude,
+          lng: longitude,
+          accuracy,
+          timestamp: Date.now(),
+        };
+        setUserLocation(newLocation);
+        setCenterOnUserLocation(true);
+        setLocationLoading(false);
+        // Reset center flag after a short delay to allow re-centering if clicked again
+        setTimeout(() => setCenterOnUserLocation(false), 100);
+      },
+      (error) => {
+        setLocationLoading(false);
+        let errorMessage = "Location unavailable";
+        
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = "Location permission denied. Enable location in your browser settings.";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = "Location information unavailable.";
+            break;
+          case error.TIMEOUT:
+            errorMessage = "Location request timed out.";
+            break;
+          default:
+            errorMessage = "Unable to get your location.";
+            break;
+        }
+        
+        setLocationError(errorMessage);
+        // Clear error after 5 seconds
+        setTimeout(() => setLocationError(null), 5000);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 30000,
+      }
+    );
+  };
+
   // Handle delete location
   const handleDeleteLocation = async (locationId: string) => {
     if (!user) {
@@ -755,12 +815,22 @@ export default function UserDashboardPage() {
           </div>
           {/* Mobile: Full-width buttons for easier tapping on iOS Safari */}
           {mode === "VIEW" && (
-            <button
-              onClick={handleAddPlace}
-              className="w-full rounded-lg border border-accent/60 bg-accent/15 px-6 py-3 text-base font-medium text-accent transition-colors active:bg-accent/20 sm:w-auto sm:py-2 sm:text-sm hover:border-accent hover:bg-accent/20"
-            >
-              Add Place
-            </button>
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:gap-2">
+              <button
+                onClick={handleCenterOnMe}
+                disabled={locationLoading}
+                className="w-full rounded-lg border border-surface/60 bg-surface/30 px-6 py-3 text-base font-medium text-text transition-colors active:bg-surface/50 disabled:opacity-50 sm:w-auto sm:py-2 sm:text-sm hover:border-accent/60 hover:bg-surface/50"
+                title="Uses browser location. Not saved."
+              >
+                {locationLoading ? "Locating..." : "Center on me"}
+              </button>
+              <button
+                onClick={handleAddPlace}
+                className="w-full rounded-lg border border-accent/60 bg-accent/15 px-6 py-3 text-base font-medium text-accent transition-colors active:bg-accent/20 sm:w-auto sm:py-2 sm:text-sm hover:border-accent hover:bg-accent/20"
+              >
+                Add Place
+              </button>
+            </div>
           )}
           {mode === "ADD_PLACE" && (
             <div className="flex gap-3 sm:flex-row">
@@ -781,10 +851,15 @@ export default function UserDashboardPage() {
           )}
         </div>
 
-        {/* Error message */}
+        {/* Error messages */}
         {error && (
           <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
             {error}
+          </div>
+        )}
+        {locationError && (
+          <div className="mb-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-400">
+            {locationError}
           </div>
         )}
 
@@ -805,6 +880,8 @@ export default function UserDashboardPage() {
                 hideTempMarker={showForm}
                 highlightedLocationId={highlightedLocationId}
                 centerOnLocation={centerOnLocation}
+                userLocation={userLocation}
+                centerOnUserLocation={centerOnUserLocation}
               />
               {/* Show form overlay when user clicks "Place Here" */}
               {showForm && pendingCoordinates && mode === "ADD_PLACE" && (

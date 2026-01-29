@@ -12,6 +12,13 @@ export interface Place {
   category_name?: string | null;
 }
 
+interface UserLocation {
+  lat: number;
+  lng: number;
+  accuracy?: number;
+  timestamp?: number;
+}
+
 interface DashboardMapProps {
   mode: MapMode;
   onMapCenterChange?: (lng: number, lat: number) => void;
@@ -19,6 +26,8 @@ interface DashboardMapProps {
   hideTempMarker?: boolean; // Hide temporary marker when form is shown
   highlightedLocationId?: string | null; // ID of location to highlight
   centerOnLocation?: { lat: number; lng: number }; // Coordinates to center map on
+  userLocation?: UserLocation | null; // User's current location (client-side only)
+  centerOnUserLocation?: boolean; // Flag to center map on user location
 }
 
 /**
@@ -46,6 +55,8 @@ export default function DashboardMap({
   hideTempMarker = false,
   highlightedLocationId = null,
   centerOnLocation,
+  userLocation = null,
+  centerOnUserLocation = false,
 }: DashboardMapProps) {
   // Ref to the container div - React will attach this to the DOM element
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -60,6 +71,8 @@ export default function DashboardMap({
   const placePopupsRef = useRef<mapboxgl.Popup[]>([]);
   // Ref to highlighted marker (for view-on-map feature)
   const highlightedMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  // Ref to user location marker ("You are here")
+  const userLocationMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
   // Initialize map exactly once
   useEffect(() => {
@@ -98,6 +111,8 @@ export default function DashboardMap({
       tempMarkerRef.current = null;
       highlightedMarkerRef.current?.remove();
       highlightedMarkerRef.current = null;
+      userLocationMarkerRef.current?.remove();
+      userLocationMarkerRef.current = null;
       
       if (mapRef.current) {
         mapRef.current.remove();
@@ -352,6 +367,91 @@ export default function DashboardMap({
       duration: 1000,
     });
   }, [centerOnLocation, mode]);
+
+  // Handle user location marker and centering
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    const map = mapRef.current;
+
+    // Wait for map to load before adding user location marker
+    if (!map.loaded()) {
+      map.once("load", () => {
+        renderUserLocation();
+      });
+    } else {
+      renderUserLocation();
+    }
+
+    function renderUserLocation() {
+      // Remove existing user location marker
+      userLocationMarkerRef.current?.remove();
+      userLocationMarkerRef.current = null;
+
+      if (!userLocation) {
+        return;
+      }
+
+      // Create user location marker with distinct styling ("You are here")
+      const outerEl = document.createElement("div");
+      outerEl.style.width = "16px";
+      outerEl.style.height = "16px";
+      outerEl.style.display = "block";
+      outerEl.style.transition = "none";
+
+      const innerEl = document.createElement("div");
+      innerEl.className = "user-location-marker";
+      innerEl.style.width = "100%";
+      innerEl.style.height = "100%";
+      innerEl.style.borderRadius = "50%";
+      innerEl.style.backgroundColor = "#3B82F6"; // Blue color to distinguish from place markers
+      innerEl.style.border = "3px solid rgba(59, 130, 246, 0.8)";
+      innerEl.style.boxShadow = "0 0 12px rgba(59, 130, 246, 0.6)";
+      innerEl.style.cursor = "default";
+      innerEl.style.zIndex = "1500"; // Higher than place markers
+
+      outerEl.appendChild(innerEl);
+
+      // Create marker
+      userLocationMarkerRef.current = new mapboxgl.Marker({
+        element: outerEl,
+        anchor: "center",
+      })
+        .setLngLat([userLocation.lng, userLocation.lat])
+        .addTo(map);
+
+      // Add popup with "You are here" text
+      const popup = new mapboxgl.Popup({
+        closeButton: false,
+        closeOnClick: true,
+        className: "user-location-popup",
+        offset: 25,
+      })
+        .setHTML(`
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <div style="font-size: 14px; font-weight: 600; color: #3B82F6;">You are here</div>
+            ${userLocation.accuracy ? `<div style="font-size: 11px; color: rgba(233, 255, 242, 0.6);">Accuracy: ${Math.round(userLocation.accuracy)}m</div>` : ''}
+          </div>
+        `);
+
+      userLocationMarkerRef.current.setPopup(popup);
+    }
+  }, [userLocation]);
+
+  // Handle centering map on user location (separate effect to avoid re-rendering marker)
+  useEffect(() => {
+    if (!mapRef.current || !centerOnUserLocation || !userLocation) return;
+
+    const map = mapRef.current;
+    const currentZoom = map.getZoom();
+    const targetZoom = currentZoom < 14 ? 14 : Math.min(currentZoom, 16);
+
+    map.flyTo({
+      center: [userLocation.lng, userLocation.lat],
+      zoom: targetZoom,
+      duration: 1000,
+    });
+  }, [centerOnUserLocation, userLocation]);
 
   return (
     <div className="relative h-full w-full">

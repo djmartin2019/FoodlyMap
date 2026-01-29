@@ -14,6 +14,8 @@ import ProfilePage from "./pages/ProfilePage";
 import RequestAccessPage from "./pages/RequestAccessPage";
 import SetPasswordPage from "./pages/SetPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import TermsPage from "./pages/TermsPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import { RequireAuth } from "./components/RequireAuth";
 import { useAuth } from "./contexts/AuthContext";
 
@@ -33,6 +35,18 @@ const contactRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/contact",
   component: ContactPage,
+});
+
+const termsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/terms",
+  component: TermsPage,
+});
+
+const privacyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/privacy",
+  component: PrivacyPolicyPage,
 });
 
 // Request access route (public, no authentication required)
@@ -99,6 +113,8 @@ const profileRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   dashboardRoute,
   contactRoute,
+  termsRoute,
+  privacyRoute,
   loginRoute,
   requestAccessRoute,
   setPasswordRoute,
@@ -183,9 +199,9 @@ function RootLayout() {
         <Outlet />
       </main>
       <footer className="border-t border-surface/60 bg-surface/20 py-8">
-        <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-center gap-4 px-6 text-sm text-text/60 md:flex-row">
+        <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-center gap-3 px-6 text-sm text-text/60 sm:flex-row sm:justify-center sm:gap-4">
           <div>© {currentYear} Foodly Map</div>
-          <div className="hidden md:block">•</div>
+          <div className="hidden sm:block text-text/40">•</div>
           <div>
             Built by{" "}
             <a
@@ -198,13 +214,29 @@ function RootLayout() {
               DJM-Tech
             </a>
           </div>
-          <div className="hidden md:block">•</div>
+          <div className="hidden sm:block text-text/40">•</div>
           <Link
             to="/contact"
             className="text-accent/70 transition-colors hover:text-accent"
             aria-label="Contact page"
           >
             Contact
+          </Link>
+          <div className="hidden sm:block text-text/40">•</div>
+          <Link
+            to="/terms"
+            className="text-accent/70 transition-colors hover:text-accent"
+            aria-label="Terms of Service"
+          >
+            Terms
+          </Link>
+          <div className="hidden sm:block text-text/40">•</div>
+          <Link
+            to="/privacy"
+            className="text-accent/70 transition-colors hover:text-accent"
+            aria-label="Privacy Policy"
+          >
+            Privacy
           </Link>
         </div>
       </footer>
