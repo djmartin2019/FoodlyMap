@@ -6,6 +6,7 @@ import DashboardMap, { MapMode, Place } from "../components/DashboardMap";
 import PlaceNameForm from "../components/PlaceNameForm";
 import LocationsTable, { Location } from "../components/LocationsTable";
 import { RequireAuth } from "../components/RequireAuth";
+import AddToListModal from "../components/AddToListModal";
 
 interface Category {
   id: string;
@@ -30,6 +31,7 @@ export default function UserDashboardPage() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [centerOnUserLocation, setCenterOnUserLocation] = useState(false);
+  const [addingToListPlace, setAddingToListPlace] = useState<Place | null>(null);
 
   // Load categories when user becomes available
   // Memoized to prevent unnecessary re-fetches
@@ -882,6 +884,7 @@ export default function UserDashboardPage() {
                 centerOnLocation={centerOnLocation}
                 userLocation={userLocation}
                 centerOnUserLocation={centerOnUserLocation}
+                onAddToList={(place) => setAddingToListPlace(place)}
               />
               {/* Show form overlay when user clicks "Place Here" */}
               {showForm && pendingCoordinates && mode === "ADD_PLACE" && (
@@ -919,6 +922,18 @@ export default function UserDashboardPage() {
         />
       </div>
       </div>
+
+      {/* Add to List Modal */}
+      {addingToListPlace && (
+        <AddToListModal
+          isOpen={!!addingToListPlace}
+          onClose={() => setAddingToListPlace(null)}
+          place={{
+            id: addingToListPlace.id,
+            name: addingToListPlace.name,
+          }}
+        />
+      )}
     </RequireAuth>
   );
 }

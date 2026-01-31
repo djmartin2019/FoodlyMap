@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-table";
 import EditLocationModal from "./EditLocationModal";
 import DeleteConfirmationDialog from "./DeleteConfirmationDialog";
+import AddToListModal from "./AddToListModal";
 
 export interface Location {
   id: string;
@@ -195,6 +196,7 @@ export default function LocationsTable({
   const navigate = useNavigate();
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [deletingLocation, setDeletingLocation] = useState<Location | null>(null);
+  const [addingToListLocation, setAddingToListLocation] = useState<Location | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -337,6 +339,13 @@ export default function LocationsTable({
                 title="View on Map"
               >
                 View
+              </button>
+              <button
+                onClick={() => setAddingToListLocation(location)}
+                className="rounded border border-surface/60 bg-surface/30 px-2 py-1 text-xs font-medium text-text transition-colors hover:border-accent/60 hover:bg-surface/50"
+                title="Add to List"
+              >
+                Add to List
               </button>
               {onUpdate && (
                 <button
@@ -549,6 +558,18 @@ export default function LocationsTable({
         <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400 shadow-neon-sm">
           {actionError}
         </div>
+      )}
+
+      {/* Add to List Modal */}
+      {addingToListLocation && (
+        <AddToListModal
+          isOpen={!!addingToListLocation}
+          onClose={() => setAddingToListLocation(null)}
+          place={{
+            id: addingToListLocation.id,
+            name: addingToListLocation.name,
+          }}
+        />
       )}
     </div>
   );

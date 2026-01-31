@@ -16,6 +16,9 @@ import SetPasswordPage from "./pages/SetPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import TermsPage from "./pages/TermsPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import ListsPage from "./pages/ListsPage";
+import ListDetailPage from "./pages/ListDetailPage";
+import PublicListPage from "./pages/PublicListPage";
 import { RequireAuth } from "./components/RequireAuth";
 import { useAuth } from "./contexts/AuthContext";
 
@@ -47,6 +50,16 @@ const privacyRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/privacy",
   component: PrivacyPolicyPage,
+});
+
+// Public list route (no auth required)
+const publicListRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/l/$slug",
+  component: PublicListPage,
+  validateSearch: (search: Record<string, unknown>) => {
+    return search;
+  },
 });
 
 // Request access route (public, no authentication required)
@@ -110,6 +123,28 @@ const profileRoute = createRoute({
   ),
 });
 
+// Protected lists route (requires authentication)
+const listsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/lists",
+  component: () => (
+    <RequireAuth>
+      <ListsPage />
+    </RequireAuth>
+  ),
+});
+
+// Protected list detail route (requires authentication, owner-only management)
+const listDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/lists/$listId",
+  component: () => (
+    <RequireAuth>
+      <ListDetailPage />
+    </RequireAuth>
+  ),
+});
+
 const routeTree = rootRoute.addChildren([
   dashboardRoute,
   contactRoute,
@@ -121,6 +156,9 @@ const routeTree = rootRoute.addChildren([
   resetPasswordRoute,
   userDashboardRoute,
   profileRoute,
+  listsRoute,
+  listDetailRoute,
+  publicListRoute,
 ]);
 
 export const router = createRouter({ 
@@ -175,6 +213,12 @@ function RootLayout() {
                   className="text-sm text-text/70 transition-colors hover:text-accent"
                 >
                   Profile
+                </Link>
+                <Link
+                  to="/lists"
+                  className="text-sm text-text/70 transition-colors hover:text-accent"
+                >
+                  Lists
                 </Link>
                 <button
                   onClick={handleSignOut}

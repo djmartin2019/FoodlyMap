@@ -255,7 +255,7 @@ export default function LoginPage() {
             to="/request-access"
             className="text-sm font-medium text-accent/80 transition-colors hover:text-accent"
           >
-            Join the Beta
+            Request Beta Access
           </Link>
         </div>
       </div>

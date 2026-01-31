@@ -28,6 +28,7 @@ interface DashboardMapProps {
   centerOnLocation?: { lat: number; lng: number }; // Coordinates to center map on
   userLocation?: UserLocation | null; // User's current location (client-side only)
   centerOnUserLocation?: boolean; // Flag to center map on user location
+  onAddToList?: (place: Place) => void; // Callback when "Add to List" is clicked from popup
 }
 
 /**
@@ -57,6 +58,7 @@ export default function DashboardMap({
   centerOnLocation,
   userLocation = null,
   centerOnUserLocation = false,
+  onAddToList,
 }: DashboardMapProps) {
   // Ref to the container div - React will attach this to the DOM element
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -291,11 +293,24 @@ export default function DashboardMap({
 
         // Create popup with proper styling - include name, address, and category
         // Use inline styles since Tailwind classes don't work in setHTML
+        // Add "Add to List" button if callback is provided
+        const addToListButton = onAddToList
+          ? `<button 
+               id="add-to-list-${place.id}" 
+               style="margin-top: 8px; padding: 6px 12px; background: rgba(57, 255, 136, 0.15); border: 1px solid rgba(57, 255, 136, 0.6); border-radius: 6px; color: #39FF88; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; width: 100%;"
+               onmouseover="this.style.background='rgba(57, 255, 136, 0.2)'; this.style.borderColor='#39FF88';"
+               onmouseout="this.style.background='rgba(57, 255, 136, 0.15)'; this.style.borderColor='rgba(57, 255, 136, 0.6)';"
+             >
+               Add to List
+             </button>`
+          : "";
+        
         const popupContent = `
           <div style="display: flex; flex-direction: column; gap: 4px;">
             <div style="font-size: 14px; font-weight: 600; color: #e9fff2;">${place.name}</div>
             ${place.display_address ? `<div style="font-size: 12px; color: rgba(233, 255, 242, 0.7);">${place.display_address}</div>` : ''}
             ${place.category_name ? `<div style="font-size: 12px; color: rgba(57, 255, 136, 0.8);">${place.category_name}</div>` : ''}
+            ${addToListButton}
           </div>
         `;
         const popup = new mapboxgl.Popup({
@@ -317,6 +332,24 @@ export default function DashboardMap({
         // Only attach popup in VIEW mode (not ADD_PLACE) to prevent interaction during place addition
         if (mode !== "ADD_PLACE") {
           marker.setPopup(popup);
+          
+          // Add click handler for "Add to List" button if callback is provided
+          if (onAddToList) {
+            // Wait for popup to be added to DOM, then attach click handler
+            popup.on('open', () => {
+              // Use setTimeout to ensure DOM is ready
+              setTimeout(() => {
+                const button = document.getElementById(`add-to-list-${place.id}`);
+                if (button) {
+                  button.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onAddToList(place);
+                  });
+                }
+              }, 100);
+            });
+          }
         }
 
         if (isHighlighted) {
@@ -331,7 +364,7 @@ export default function DashboardMap({
         placePopupsRef.current.push(popup);
       });
     }
-  }, [places, mode, highlightedLocationId]);
+  }, [places, mode, highlightedLocationId, onAddToList]);
 
   // Handle centering map on location from URL params
   // Use ref to track previous coordinates to prevent repeated flyTo calls
