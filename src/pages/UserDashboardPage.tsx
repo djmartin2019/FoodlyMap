@@ -67,7 +67,9 @@ export default function UserDashboardPage() {
         .order("name");
 
       if (fetchError) {
-        console.error("Error fetching categories:", fetchError);
+        if (import.meta.env.DEV) {
+          console.error("Error fetching categories:", fetchError);
+        }
         return;
       }
 
@@ -84,7 +86,9 @@ export default function UserDashboardPage() {
         // localStorage might be full or disabled, ignore
       }
     } catch (err) {
-      console.error("Unexpected error loading categories:", err);
+      if (import.meta.env.DEV) {
+        console.error("Unexpected error loading categories:", err);
+      }
     }
   }, [user]);
 
@@ -150,7 +154,9 @@ export default function UserDashboardPage() {
         .order("created_at", { ascending: false });
 
       if (fetchError) {
-        console.error("Error fetching places:", fetchError);
+        if (import.meta.env.DEV) {
+          console.error("Error fetching places:", fetchError);
+        }
         if (setLoadingState) {
           setError("Failed to load places");
           setLoading(false);
@@ -160,29 +166,74 @@ export default function UserDashboardPage() {
 
       // Transform the data for both Place interface (map) and Location interface (table)
       // category_id is now on user_places, not places
-      const userLocations: Location[] = (data || [])
-        .filter((item: any) => item.place !== null)
-        .map((item: any) => ({
-          id: item.place.id,
-          name: item.place.name,
-          latitude: item.place.latitude,
-          longitude: item.place.longitude,
-          category_id: item.category_id || null,
-          category_name: item.category?.name || null,
-          created_at: item.created_at,
-        }));
+      // Defensive filtering: ensure place exists and has required fields before mapping
+      // This prevents crashes when joined rows are null (e.g., place was deleted but user_places still references it)
+      // Deduplicate by place.id to prevent duplicate keys in React
+      const locationMap = new Map<string, Location>();
+      (data || [])
+        .filter((item: any) => {
+          // Ensure item exists, has place, and place has required fields
+          if (!item || !item.place) return false;
+          const place = item.place;
+          return (
+            typeof place === 'object' &&
+            !Array.isArray(place) &&
+            typeof place.id === 'string' &&
+            typeof place.name === 'string' &&
+            typeof place.latitude === 'number' &&
+            typeof place.longitude === 'number'
+          );
+        })
+        .forEach((item: any) => {
+          const placeId = item.place.id;
+          // Only add if we haven't seen this place_id before, or use the most recent one
+          if (!locationMap.has(placeId)) {
+            locationMap.set(placeId, {
+              id: item.place.id,
+              name: item.place.name,
+              latitude: item.place.latitude,
+              longitude: item.place.longitude,
+              category_id: item.category_id || null,
+              category_name: (item.category && typeof item.category === 'object' && !Array.isArray(item.category) && item.category.name) ? item.category.name : null,
+              created_at: item.created_at || new Date().toISOString(),
+            });
+          }
+        });
+      const userLocations: Location[] = Array.from(locationMap.values());
 
       // Also create Place array for map component (include address and category for popup)
-      const userPlaces: Place[] = (data || [])
-        .filter((item: any) => item.place !== null)
-        .map((item: any) => ({
-          id: item.place.id,
-          name: item.place.name,
-          latitude: item.place.latitude,
-          longitude: item.place.longitude,
-          display_address: item.place.display_address || null,
-          category_name: item.category?.name || null,
-        }));
+      // Defensive filtering: ensure place exists and has required fields before mapping
+      // Deduplicate by place.id to prevent duplicate keys in React
+      const placeMap = new Map<string, Place>();
+      (data || [])
+        .filter((item: any) => {
+          // Ensure item exists, has place, and place has required fields
+          if (!item || !item.place) return false;
+          const place = item.place;
+          return (
+            typeof place === 'object' &&
+            !Array.isArray(place) &&
+            typeof place.id === 'string' &&
+            typeof place.name === 'string' &&
+            typeof place.latitude === 'number' &&
+            typeof place.longitude === 'number'
+          );
+        })
+        .forEach((item: any) => {
+          const placeId = item.place.id;
+          // Only add if we haven't seen this place_id before
+          if (!placeMap.has(placeId)) {
+            placeMap.set(placeId, {
+              id: item.place.id,
+              name: item.place.name,
+              latitude: item.place.latitude,
+              longitude: item.place.longitude,
+              display_address: item.place.display_address || null,
+              category_name: (item.category && typeof item.category === 'object' && !Array.isArray(item.category) && item.category.name) ? item.category.name : null,
+            });
+          }
+        });
+      const userPlaces: Place[] = Array.from(placeMap.values());
 
       setLocations(userLocations);
       setPlaces(userPlaces);
@@ -411,15 +462,19 @@ export default function UserDashboardPage() {
                 placeId = racePlace.id;
                 placeData = racePlace;
               } else {
-                console.error("Error finding place after race condition:", raceError);
+                if (import.meta.env.DEV) {
+                  console.error("Error finding place after race condition:", raceError);
+                }
                 setError("Failed to save place. Please try again.");
                 setSaving(false);
                 return;
               }
             } else {
               // Log the full error for debugging
-              console.error("Error creating place:", insertError);
-              console.error("Place data attempted:", placeDataToInsert);
+              if (import.meta.env.DEV) {
+                console.error("Error creating place:", insertError);
+                console.error("Place data attempted:", placeDataToInsert);
+              }
               setError(`Failed to save place: ${insertError.message || "Unknown error"}`);
               setSaving(false);
               return;
@@ -446,7 +501,9 @@ export default function UserDashboardPage() {
           .single();
 
         if (insertError) {
-          console.error("Error creating place:", insertError);
+          if (import.meta.env.DEV) {
+            console.error("Error creating place:", insertError);
+          }
           setError("Failed to save place. Please try again.");
           setSaving(false);
           return;
@@ -465,7 +522,9 @@ export default function UserDashboardPage() {
         .maybeSingle();
 
       if (checkError && checkError.code !== "PGRST116") {
-        console.error("Error checking user_places:", checkError);
+        if (import.meta.env.DEV) {
+          console.error("Error checking user_places:", checkError);
+        }
         setError("Failed to save place. Please try again.");
         setSaving(false);
         return;
@@ -498,7 +557,9 @@ export default function UserDashboardPage() {
           if (linkError.code === "23505" || linkError.message?.includes("unique")) {
             // Already exists - that's fine, continue
           } else {
-            console.error("Error linking place to user:", linkError);
+            if (import.meta.env.DEV) {
+              console.error("Error linking place to user:", linkError);
+            }
             setError("Failed to link place to your account. Please try again.");
             setSaving(false);
             return;
@@ -543,8 +604,16 @@ export default function UserDashboardPage() {
         created_at: placeData.created_at,
       };
 
-      setPlaces([...places, newPlace]);
-      setLocations([newLocation, ...locations]);
+      // Deduplicate: only add if the place doesn't already exist
+      // This prevents duplicate keys in React when the same place is added multiple times
+      setPlaces(prevPlaces => {
+        const exists = prevPlaces.some(p => p.id === newPlace.id);
+        return exists ? prevPlaces : [...prevPlaces, newPlace];
+      });
+      setLocations(prevLocations => {
+        const exists = prevLocations.some(loc => loc.id === newLocation.id);
+        return exists ? prevLocations : [newLocation, ...prevLocations];
+      });
       
       // Invalidate cache
       if (user) {
@@ -555,12 +624,18 @@ export default function UserDashboardPage() {
         }
       }
       
+      // Reset all form/map state after successful save
+      // This ensures the next "Add Place" starts fresh and doesn't reuse old coordinates
+      // Fixes bug where re-added place would copy last location
       setMode("VIEW");
       setPendingCoordinates(null);
       setShowForm(false);
       setSaving(false);
+      setError(null);
     } catch (err) {
-      console.error("Unexpected error saving place:", err);
+      if (import.meta.env.DEV) {
+        console.error("Unexpected error saving place:", err);
+      }
       setError("An unexpected error occurred. Please try again.");
       setSaving(false);
     }
@@ -590,7 +665,9 @@ export default function UserDashboardPage() {
         .single();
       
       if (checkError || !userPlaceCheck) {
-        console.error("User does not have access to this place:", checkError);
+        if (import.meta.env.DEV) {
+          console.error("User does not have access to this place:", checkError);
+        }
         throw new Error("You do not have permission to update this location");
       }
 
@@ -602,7 +679,9 @@ export default function UserDashboardPage() {
         .eq("id", locationId);
 
       if (placeUpdateError) {
-        console.error("Error updating place name:", placeUpdateError);
+        if (import.meta.env.DEV) {
+          console.error("Error updating place name:", placeUpdateError);
+        }
         throw new Error(placeUpdateError.message || "Failed to update place name");
       }
 
@@ -625,7 +704,9 @@ export default function UserDashboardPage() {
         .select();
 
       if (userPlaceUpdateError) {
-        console.error("Error updating user_places category:", userPlaceUpdateError);
+        if (import.meta.env.DEV) {
+          console.error("Error updating user_places category:", userPlaceUpdateError);
+        }
         throw new Error(userPlaceUpdateError.message || "Failed to update category");
       }
 
@@ -668,11 +749,15 @@ export default function UserDashboardPage() {
 
       // Refetch in background to ensure consistency (don't await, don't set loading state)
       loadLocations(false).catch(err => {
-        console.error("Error refetching locations after update:", err);
+        if (import.meta.env.DEV) {
+          console.error("Error refetching locations after update:", err);
+        }
         // If refetch fails, we still have the optimistic update
       });
     } catch (err) {
-      console.error("Unexpected error updating location:", err);
+      if (import.meta.env.DEV) {
+        console.error("Unexpected error updating location:", err);
+      }
       throw err;
     }
   };
@@ -734,6 +819,15 @@ export default function UserDashboardPage() {
   };
 
   // Handle delete location
+  // IMPORTANT: This function deletes ONLY the user's relationship to a place (user_places row),
+  // NOT the global place itself. This ensures:
+  // 1. Other users who have saved the same place are not affected
+  // 2. Lists that reference this place continue to work
+  // 3. The place can be re-added by the same or different users later
+  // 
+  // If the place has no remaining references (no user_places or list_places rows),
+  // it should be cleaned up by a database function or scheduled job, not by client code.
+  // Client code only has anon key and should not delete global places directly.
   const handleDeleteLocation = async (locationId: string) => {
     if (!user) {
       throw new Error("User not authenticated");
@@ -741,6 +835,7 @@ export default function UserDashboardPage() {
 
     try {
       // Delete from user_places junction table (this removes the link, not the place itself)
+      // This is safe because RLS ensures users can only delete their own user_places rows
       const { error: deleteError } = await supabase
         .from("user_places")
         .delete()
@@ -748,9 +843,17 @@ export default function UserDashboardPage() {
         .eq("place_id", locationId);
 
       if (deleteError) {
-        console.error("Error deleting user_places link:", deleteError);
+        if (import.meta.env.DEV) {
+          console.error("Error deleting user_places link:", deleteError);
+        }
         throw new Error("Failed to delete location");
       }
+
+      // Reset form/map state after successful delete
+      setMode("VIEW");
+      setPendingCoordinates(null);
+      setShowForm(false);
+      setHighlightedLocationId(null);
 
       // Optimistically update UI
       setLocations(locations.filter(loc => loc.id !== locationId));
@@ -767,11 +870,15 @@ export default function UserDashboardPage() {
 
       // Refetch in background to ensure consistency (don't await, don't set loading state)
       loadLocations(false).catch(err => {
-        console.error("Error refetching locations after delete:", err);
+        if (import.meta.env.DEV) {
+          console.error("Error refetching locations after delete:", err);
+        }
         // If refetch fails, we still have the optimistic update
       });
     } catch (err) {
-      console.error("Unexpected error deleting location:", err);
+      if (import.meta.env.DEV) {
+        console.error("Unexpected error deleting location:", err);
+      }
       // Revert optimistic update on error
       await loadLocations();
       throw err;

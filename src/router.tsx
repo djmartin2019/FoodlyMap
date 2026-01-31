@@ -6,6 +6,7 @@ import {
   createRouter,
   useNavigate
 } from "@tanstack/react-router";
+import { PostHogPageview } from "./components/PostHogPageview";
 import DashboardPage from "./pages/DashboardPage";
 import ContactPage from "./pages/ContactPage";
 import LoginPage from "./pages/LoginPage";
@@ -161,6 +162,9 @@ const routeTree = rootRoute.addChildren([
   publicListRoute,
 ]);
 
+// Create router instance once and export it
+// This ensures the router is stable and not recreated on every import
+// RouterProvider in main.tsx uses this same instance, preventing __store crashes
 export const router = createRouter({ 
   routeTree,
   // Ensure router works properly with browser history
@@ -189,6 +193,7 @@ function RootLayout() {
 
   return (
     <div className="min-h-screen bg-bg text-text flex flex-col" style={{ minHeight: '100dvh' }}>
+      <PostHogPageview />
       <nav className="sticky top-0 z-10 border-b border-surface bg-bg/90 backdrop-blur" aria-label="Main navigation" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
           <Link

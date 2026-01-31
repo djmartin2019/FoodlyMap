@@ -68,9 +68,19 @@ export default function AddSavedPlaceToListModal({
         }
 
         // Transform the data to extract places
+        // Defensive filtering: ensure places exist and have required fields
         const userPlaces: Place[] = (placesData || [])
-          .map((up: any) => up.places)
-          .filter((p: Place | null) => p !== null) as Place[];
+          .filter((up: any) => {
+            if (!up || !up.places) return false;
+            const place = up.places;
+            return (
+              typeof place === 'object' &&
+              !Array.isArray(place) &&
+              typeof place.id === 'string' &&
+              typeof place.name === 'string'
+            );
+          })
+          .map((up: any) => up.places) as Place[];
 
         setPlaces(userPlaces);
         const candidatePlaceIds = new Set(userPlaces.map((p) => p.id));

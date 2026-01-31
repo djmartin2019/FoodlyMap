@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
-import posthog from "posthog-js";
 
 type AuthState = {
   initialized: boolean;
@@ -35,17 +34,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setInitialized(true);
 
         // PostHog: Identify user if session exists on initial load
+        // Use dynamic import to avoid initializing PostHog before PostHogProvider
         if (session?.user) {
-          try {
-            posthog.identify(session.user.id);
-            if (posthog.people) {
-              posthog.people.set({ beta: true });
+          import("posthog-js").then(({ default: posthog }) => {
+            try {
+              // PostHog will handle if not initialized (no-op)
+              posthog.identify(session.user.id);
+              if (posthog.people) {
+                posthog.people.set({ beta: true });
+              }
+            } catch (e) {
+              // Silently ignore PostHog errors
             }
-          } catch (e) {
-            if (import.meta.env.DEV) {
-              console.warn("PostHog identify failed:", e);
-            }
-          }
+          }).catch(() => {
+            // Silently ignore if PostHog is not available
+          });
         }
       })
       .catch((e) => {
@@ -62,29 +65,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setInitialized(true);
 
       // PostHog: Identify user on login, reset on logout
+      // Use dynamic import to avoid initializing PostHog before PostHogProvider
       if (newSession?.user) {
-        try {
-          posthog.identify(newSession.user.id);
-          // Mark as beta user (optional)
-          if (posthog.people) {
-            posthog.people.set({ beta: true });
+        import("posthog-js").then(({ default: posthog }) => {
+          try {
+            // PostHog will handle if not initialized (no-op)
+            posthog.identify(newSession.user.id);
+            if (posthog.people) {
+              posthog.people.set({ beta: true });
+            }
+          } catch (e) {
+            // Silently ignore PostHog errors
           }
-        } catch (e) {
-          // Silently ignore PostHog errors (e.g., blocked by adblock)
-          if (import.meta.env.DEV) {
-            console.warn("PostHog identify failed:", e);
-          }
-        }
+        }).catch(() => {
+          // Silently ignore if PostHog is not available
+        });
       } else {
         // User logged out
-        try {
-          posthog.reset();
-        } catch (e) {
-          // Silently ignore PostHog errors
-          if (import.meta.env.DEV) {
-            console.warn("PostHog reset failed:", e);
+        import("posthog-js").then(({ default: posthog }) => {
+          try {
+            // PostHog will handle if not initialized (no-op)
+            posthog.reset();
+          } catch (e) {
+            // Silently ignore PostHog errors
           }
-        }
+        }).catch(() => {
+          // Silently ignore if PostHog is not available
+        });
       }
     });
 
@@ -108,13 +115,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(null);
         
         // PostHog: Reset on logout
-        try {
-          posthog.reset();
-        } catch (e) {
-          if (import.meta.env.DEV) {
-            console.warn("PostHog reset failed:", e);
+        // Use dynamic import to avoid initializing PostHog before PostHogProvider
+        import("posthog-js").then(({ default: posthog }) => {
+          try {
+            // PostHog will handle if not initialized (no-op)
+            posthog.reset();
+          } catch (e) {
+            // Silently ignore PostHog errors
           }
-        }
+        }).catch(() => {
+          // Silently ignore if PostHog is not available
+        });
         
         // Always clear Supabase localStorage keys first
         // This ensures we clean up even if remote logout fails

@@ -23,10 +23,18 @@ export function PostHogPageview() {
     lastPathRef.current = currentPath;
 
     // Capture pageview with current URL
-    posthog.capture("$pageview", {
-      $current_url: window.location.href,
-      path: location.pathname,
-    });
+    // Wrap in try-catch to prevent errors from breaking the app
+    try {
+      posthog.capture("$pageview", {
+        $current_url: window.location.href,
+        path: location.pathname,
+      });
+    } catch (error) {
+      // Silently ignore PostHog errors (e.g., blocked by adblock, network issues)
+      if (import.meta.env.DEV) {
+        console.warn("PostHog pageview capture failed:", error);
+      }
+    }
   }, [posthog, location.pathname, location.search]);
 
   return null;

@@ -111,7 +111,18 @@ export default function ListDetailPage() {
   // Transform list places to table rows
   const tableRows = useMemo<ListPlaceRow[]>(() => {
     return listPlaces
-      .filter((lp) => lp.places) // Filter out any places that failed to load
+      .filter((lp) => {
+        // Defensive check: ensure lp exists, has places, and places has required fields
+        // This prevents crashes when joined rows are null (e.g., place was deleted but list_places still references it)
+        if (!lp || !lp.places) return false;
+        const place = lp.places;
+        return (
+          typeof place === 'object' &&
+          !Array.isArray(place) &&
+          typeof place.id === 'string' &&
+          typeof place.name === 'string'
+        );
+      })
       .map((lp) => {
         const place = lp.places;
         const addressParts = [
