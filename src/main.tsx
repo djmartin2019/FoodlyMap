@@ -17,33 +17,35 @@ if (import.meta.env.DEV && !posthogKey) {
   console.warn("PostHog analytics not configured: VITE_PUBLIC_POSTHOG_KEY is missing");
 }
 
-// CRITICAL: RouterProvider must ALWAYS mount - never conditionally render
-// AuthProvider is data-only and never blocks rendering
-const App = () => {
-  // Only initialize PostHog if key is provided
+/**
+ * MaybePostHogProvider - Conditionally wraps children with PostHogProvider
+ * when env vars are present, otherwise returns children unchanged.
+ * This ensures the component tree structure is stable.
+ */
+function MaybePostHogProvider({ children }: { children: React.ReactNode }) {
   if (posthogKey && posthogHost) {
     return (
-      <ErrorBoundary>
-        <PostHogProvider
-          apiKey={posthogKey}
-          options={{
-            api_host: posthogHost,
-            autocapture: false,
-            capture_pageview: false, // We handle SPA pageviews manually
-            loaded: () => {
-              // Suppress PostHog initialization warnings
-            },
-          }}
-        >
-          <AuthProvider>
-            <RouterProvider router={router} />
-          </AuthProvider>
-        </PostHogProvider>
-      </ErrorBoundary>
+      <PostHogProvider
+        apiKey={posthogKey}
+        options={{
+          api_host: posthogHost,
+          autocapture: false,
+          capture_pageview: false, // We handle SPA pageviews manually
+          capture_pageleave: true,
+        }}
+      >
+        {children}
+      </PostHogProvider>
     );
   }
+  return <>{children}</>;
+}
 
-  // Fallback: render app without PostHog if not configured
+/**
+ * AppShell - Always renders the same component structure.
+ * This ensures RouterProvider and AuthProvider are always mounted consistently.
+ */
+function AppShell() {
   return (
     <ErrorBoundary>
       <AuthProvider>
@@ -51,13 +53,11 @@ const App = () => {
       </AuthProvider>
     </ErrorBoundary>
   );
-};
+}
 
-// Suppress harmless browser extension errors
+// Suppress harmless browser extension errors (dev only)
 // These errors come from React DevTools, Redux DevTools, ad blockers, etc.
-// and don't affect app functionality
-if (typeof window !== 'undefined') {
-  // Catch unhandled promise rejections from browser extensions
+if (import.meta.env.DEV && typeof window !== 'undefined') {
   window.addEventListener('unhandledrejection', (event) => {
     const message = event.reason?.message || event.reason?.toString() || '';
     // Suppress "message channel closed" errors from browser extensions
@@ -66,22 +66,22 @@ if (typeof window !== 'undefined') {
       message.includes('asynchronous response')
     ) {
       event.preventDefault();
-      // Don't log these errors as they're harmless
-      return false;
     }
   }, { capture: true });
 }
 
-// Store root instance to prevent re-creation (React StrictMode causes double mount in dev)
-let root: ReactDOM.Root | null = null;
+// Get root element and validate it exists
 const rootElement = document.getElementById("root");
-
-if (!root) {
-  root = ReactDOM.createRoot(rootElement!);
+if (!rootElement) {
+  throw new Error("Root element '#root' not found. Cannot mount React app.");
 }
 
+// Create root and render
+const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <MaybePostHogProvider>
+      <AppShell />
+    </MaybePostHogProvider>
   </React.StrictMode>
 );
