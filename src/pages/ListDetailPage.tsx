@@ -256,8 +256,23 @@ export default function ListDetailPage() {
                   try {
                     await navigator.clipboard.writeText(url);
                     alert("Public link copied to clipboard!");
+                    
+                    // PostHog: Track share click
+                    try {
+                      import("posthog-js").then(({ default: posthog }) => {
+                        posthog.capture("list_share_clicked", {
+                          list_id: list.id,
+                          slug: list.slug,
+                          visibility: list.visibility,
+                        });
+                      });
+                    } catch (e) {
+                      // Silently ignore PostHog errors
+                    }
                   } catch (err) {
-                    console.error("Failed to copy:", err);
+                    if (import.meta.env.DEV) {
+                      console.error("Failed to copy link:", err);
+                    }
                   }
                 }}
                 className="text-sm text-accent/70 transition-colors hover:text-accent"

@@ -131,7 +131,9 @@ export default function AddToListModal({
       if (!newList?.id) {
         const errorMsg = "List creation did not return an id";
         if (import.meta.env.DEV) {
-          console.error(errorMsg, newList);
+            if (import.meta.env.DEV) {
+              console.error(errorMsg, newList);
+            }
         }
         setError("Failed to create list. Please try again.");
         setCreating(false);
@@ -159,6 +161,18 @@ export default function AddToListModal({
         setError("List created but couldn't add place. Please try adding it manually.");
         setCreating(false);
         return;
+      }
+
+      // PostHog: Track list creation
+      try {
+        import("posthog-js").then(({ default: posthog }) => {
+          posthog.capture("list_created", {
+            list_id: newList.id,
+            visibility: newListVisibility,
+          });
+        });
+      } catch (e) {
+        // Silently ignore PostHog errors
       }
 
       // Step 3: Reload lists to get full list data (including slug, created_at, etc.)

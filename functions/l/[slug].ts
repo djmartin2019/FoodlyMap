@@ -193,12 +193,55 @@ function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (m) => map[m]);
 }
 
+/**
+ * Validates slug format and length
+ * @param slug - Slug to validate
+ * @returns true if valid, false otherwise
+ */
+function isValidSlug(slug: string): boolean {
+  // Trim whitespace
+  const trimmed = slug.trim();
+  
+  // Check length (max 100 characters)
+  if (trimmed.length === 0 || trimmed.length > 100) {
+    return false;
+  }
+  
+  // Allow alphanumeric, hyphens, and underscores
+  // This matches typical URL slug patterns
+  const slugPattern = /^[a-zA-Z0-9_-]+$/;
+  return slugPattern.test(trimmed);
+}
+
 export const onRequest = async (context: PagesFunctionContext<Env>) => {
   const { request, env, params } = context;
   const slug = params.slug as string;
 
   if (!slug) {
     // No slug, pass through to SPA
+    return context.next();
+  }
+
+  // Validate slug format and length before processing
+  if (!isValidSlug(slug)) {
+    // Invalid slug - for bots, return generic OG HTML
+    // For regular users, pass through to SPA (they'll get 404 from SPA)
+    const userAgent = request.headers.get('user-agent');
+    const isBotRequest = isBot(userAgent);
+    
+    if (isBotRequest) {
+      const url = new URL(request.url);
+      const baseUrl = `${url.protocol}//${url.host}`;
+      const html = generateOGHTML(null, slug, baseUrl);
+      return new Response(html, {
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'public, max-age=3600, s-maxage=3600',
+        },
+      });
+    }
+    
+    // Not a bot with invalid slug - pass through to SPA
     return context.next();
   }
 
@@ -211,7 +254,7 @@ export const onRequest = async (context: PagesFunctionContext<Env>) => {
     return context.next();
   }
 
-  // Bot request - fetch list data and return OG HTML
+  // Bot request with valid slug - fetch list data and return OG HTML
   const listData = await fetchListData(slug, env);
 
   // Determine base URL from request

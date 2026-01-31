@@ -41,7 +41,9 @@ export default function ListsPage() {
           .order("created_at", { ascending: false });
 
         if (fetchError) {
-          console.error("Error loading lists:", fetchError);
+          if (import.meta.env.DEV) {
+            console.error("Error loading lists:", fetchError);
+          }
           setError("Failed to load lists");
           setLoading(false);
           return;
@@ -50,7 +52,9 @@ export default function ListsPage() {
         setLists(data || []);
         setLoading(false);
       } catch (err) {
-        console.error("Unexpected error loading lists:", err);
+        if (import.meta.env.DEV) {
+          console.error("Unexpected error loading lists:", err);
+        }
         setError("An unexpected error occurred");
         setLoading(false);
       }
@@ -88,10 +92,24 @@ export default function ListsPage() {
         .single();
 
       if (createError) {
-        console.error("Error creating list:", createError);
+        if (import.meta.env.DEV) {
+          console.error("Error creating list:", createError);
+        }
         setError("Failed to create list. Please try again.");
         setCreating(false);
         return;
+      }
+
+      // PostHog: Track list creation
+      try {
+        import("posthog-js").then(({ default: posthog }) => {
+          posthog.capture("list_created", {
+            list_id: data.id,
+            visibility: data.visibility,
+          });
+        });
+      } catch (e) {
+        // Silently ignore PostHog errors
       }
 
       // Add new list to state
@@ -100,7 +118,9 @@ export default function ListsPage() {
       setShowCreateForm(false);
       setCreating(false);
     } catch (err) {
-      console.error("Unexpected error creating list:", err);
+      if (import.meta.env.DEV) {
+        console.error("Unexpected error creating list:", err);
+      }
       setError("An unexpected error occurred");
       setCreating(false);
     }
@@ -121,7 +141,9 @@ export default function ListsPage() {
         .eq("owner_id", user.id);
 
       if (deleteError) {
-        console.error("Error deleting list:", deleteError);
+        if (import.meta.env.DEV) {
+          console.error("Error deleting list:", deleteError);
+        }
         setError("Failed to delete list");
         return;
       }
@@ -129,7 +151,9 @@ export default function ListsPage() {
       // Remove from state
       setLists(lists.filter((list) => list.id !== listId));
     } catch (err) {
-      console.error("Unexpected error deleting list:", err);
+      if (import.meta.env.DEV) {
+        console.error("Unexpected error deleting list:", err);
+      }
       setError("An unexpected error occurred");
     }
   };
@@ -288,9 +312,22 @@ export default function ListsPage() {
                               try {
                                 await navigator.clipboard.writeText(url);
                                 alert("Public link copied to clipboard!");
+                                
+                                // PostHog: Track share click
+                                try {
+                                  import("posthog-js").then(({ default: posthog }) => {
+                                    posthog.capture("list_share_clicked", {
+                                      list_id: list.id,
+                                      slug: list.slug,
+                                      visibility: list.visibility,
+                                    });
+                                  });
+                                } catch (e) {
+                                  // Silently ignore PostHog errors
+                                }
                               } catch (err) {
                                 if (import.meta.env.DEV) {
-                                  console.error("Failed to copy:", err);
+                                  console.error("Failed to copy link:", err);
                                 }
                               }
                             }}

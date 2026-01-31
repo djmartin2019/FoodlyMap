@@ -222,7 +222,20 @@ export default function SetPasswordPage() {
           return;
         }
       } else {
-        console.log("Profile created successfully");
+        if (import.meta.env.DEV) {
+          console.log("Profile created successfully");
+        }
+        
+        // PostHog: Track signup (profile creation indicates new account)
+        try {
+          import("posthog-js").then(({ default: posthog }) => {
+            posthog.capture("auth_signed_up", {
+              method: "password",
+            });
+          });
+        } catch (e) {
+          // Silently ignore PostHog errors
+        }
       }
 
       // Step 3: Send password reset email via Supabase

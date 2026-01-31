@@ -93,9 +93,14 @@ export default function DashboardPage() {
           popupRef.current.remove();
 
           // Update popup content and position, then add to map
+          // Use safe DOM construction to prevent XSS
+          const popupNode = document.createElement("div");
+          popupNode.className = "text-sm font-semibold text-text";
+          popupNode.textContent = location.name; // Safe: textContent escapes HTML
+          
           popupRef.current
             .setLngLat([location.longitude, location.latitude])
-            .setHTML(`<div class="text-sm font-semibold text-text">${location.name}</div>`)
+            .setDOMContent(popupNode)
             .addTo(mapRef.current);
 
           // Smoothly fly to the location with zoom

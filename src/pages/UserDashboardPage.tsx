@@ -506,6 +506,19 @@ export default function UserDashboardPage() {
         }
       }
 
+      // PostHog: Track place creation
+      try {
+        import("posthog-js").then(({ default: posthog }) => {
+          posthog.capture("place_created", {
+            place_id: placeData.id,
+            has_address: !!(geocodedAddress?.display_address),
+            has_category: !!categoryId,
+          });
+        });
+      } catch (e) {
+        // Silently ignore PostHog errors
+      }
+
       // Success: Add new place to local state
       const newPlace: Place = {
         id: placeData.id,

@@ -78,6 +78,18 @@ export default function PublicListPage() {
 
         setList(data);
 
+        // PostHog: Track public list view
+        try {
+          import("posthog-js").then(({ default: posthog }) => {
+            posthog.capture("public_list_viewed", {
+              slug: data.slug,
+              is_owner: user?.id === data.owner_id,
+            });
+          });
+        } catch (e) {
+          // Silently ignore PostHog errors
+        }
+
         // Load list places with joined place data
         const { data: placesData, error: placesError } = await supabase
           .from("list_places")
@@ -89,7 +101,6 @@ export default function PublicListPage() {
           .order("added_at", { ascending: true });
 
         if (placesError) {
-          // Log error in dev only
           if (import.meta.env.DEV) {
             console.error("Error loading list places:", placesError);
           }
@@ -188,7 +199,9 @@ export default function PublicListPage() {
         .in("place_id", placeIds);
 
       if (checkError) {
-        console.error("Error checking existing places:", checkError);
+        if (import.meta.env.DEV) {
+          console.error("Error checking existing places:", checkError);
+        }
         setError("Failed to save places. Please try again.");
         setSaving(false);
         return;
@@ -214,7 +227,9 @@ export default function PublicListPage() {
         .insert(userPlacesToInsert);
 
       if (insertError) {
-        console.error("Error saving places:", insertError);
+        if (import.meta.env.DEV) {
+          console.error("Error saving places:", insertError);
+        }
         setError("Failed to save places. Please try again.");
         setSaving(false);
         return;
@@ -223,7 +238,9 @@ export default function PublicListPage() {
       // Success - navigate to dashboard
       navigate({ to: "/dashboard" });
     } catch (err) {
-      console.error("Unexpected error saving places:", err);
+      if (import.meta.env.DEV) {
+        console.error("Unexpected error saving places:", err);
+      }
       setError("An unexpected error occurred");
       setSaving(false);
     }
@@ -271,22 +288,21 @@ export default function PublicListPage() {
           )}
         </div>
 
-        {/* Owner actions */}
-        {user && list.owner_id === user.id && (
-          <div className="mb-6">
+        {/* Action buttons */}
+        <div className="mb-6 flex flex-wrap gap-3">
+          {/* Owner actions */}
+          {user && list.owner_id === user.id && (
             <Link
               to="/lists/$listId"
               params={{ listId: list.id }}
-              className="inline-block rounded-lg border border-accent/60 bg-accent/15 px-6 py-3 text-sm font-medium text-accent transition-colors hover:border-accent hover:bg-accent/20"
+              className="rounded-lg border border-accent/60 bg-accent/15 px-6 py-3 text-sm font-medium text-accent transition-colors hover:border-accent hover:bg-accent/20"
             >
               View this list in your dashboard
             </Link>
-          </div>
-        )}
+          )}
 
-        {/* Save to Map Button */}
-        {user ? (
-          <div className="mb-6">
+          {/* Save to Map Button */}
+          {user ? (
             <button
               onClick={handleSaveToMap}
               disabled={saving || listPlaces.length === 0}
@@ -294,17 +310,15 @@ export default function PublicListPage() {
             >
               {saving ? "Saving..." : "Save places to my map"}
             </button>
-          </div>
-        ) : (
-          <div className="mb-6">
+          ) : (
             <Link
               to="/login"
-              className="inline-block rounded-lg border border-accent/60 bg-accent/15 px-6 py-3 text-sm font-medium text-accent transition-colors hover:border-accent hover:bg-accent/20"
+              className="rounded-lg border border-accent/60 bg-accent/15 px-6 py-3 text-sm font-medium text-accent transition-colors hover:border-accent hover:bg-accent/20"
             >
               Log in to save this list
             </Link>
-          </div>
-        )}
+          )}
+        </div>
 
         {error && error !== "not_found" && (
           <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">

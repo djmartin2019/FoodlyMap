@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
+import { buildPlacePopupNode } from "../lib/safeDom";
 
 export type MapMode = "VIEW" | "ADD_PLACE";
 
@@ -86,7 +87,9 @@ export default function DashboardMap({
     // Get Mapbox access token from environment variable
     const token = import.meta.env.VITE_MAPBOX_TOKEN;
     if (!token) {
-      console.warn("VITE_MAPBOX_TOKEN not found in environment variables");
+      if (import.meta.env.DEV) {
+        console.warn("VITE_MAPBOX_TOKEN not found in environment variables");
+      }
       return;
     }
 
@@ -291,35 +294,25 @@ export default function DashboardMap({
         
         outerEl.appendChild(innerEl);
 
-        // Create popup with proper styling - include name, address, and category
-        // Use inline styles since Tailwind classes don't work in setHTML
-        // Add "Add to List" button if callback is provided
-        const addToListButton = onAddToList
-          ? `<button 
-               id="add-to-list-${place.id}" 
-               style="margin-top: 8px; padding: 6px 12px; background: rgba(57, 255, 136, 0.15); border: 1px solid rgba(57, 255, 136, 0.6); border-radius: 6px; color: #39FF88; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; width: 100%;"
-               onmouseover="this.style.background='rgba(57, 255, 136, 0.2)'; this.style.borderColor='#39FF88';"
-               onmouseout="this.style.background='rgba(57, 255, 136, 0.15)'; this.style.borderColor='rgba(57, 255, 136, 0.6)';"
-             >
-               Add to List
-             </button>`
-          : "";
-        
-        const popupContent = `
-          <div style="display: flex; flex-direction: column; gap: 4px;">
-            <div style="font-size: 14px; font-weight: 600; color: #e9fff2;">${place.name}</div>
-            ${place.display_address ? `<div style="font-size: 12px; color: rgba(233, 255, 242, 0.7);">${place.display_address}</div>` : ''}
-            ${place.category_name ? `<div style="font-size: 12px; color: rgba(57, 255, 136, 0.8);">${place.category_name}</div>` : ''}
-            ${addToListButton}
-          </div>
-        `;
+        // Create popup with safe DOM construction (prevents XSS)
+        // All user-provided text is set via textContent, not innerHTML
+        const popupContentNode = buildPlacePopupNode(
+          {
+            id: place.id,
+            name: place.name,
+            display_address: place.display_address,
+            category_name: place.category_name,
+          },
+          onAddToList ? () => onAddToList(place) : undefined
+        );
+
         const popup = new mapboxgl.Popup({
           closeButton: false,
           closeOnClick: true,
           className: "place-popup",
           offset: isHighlighted ? 30 : 25, // Offset popup above marker
         })
-          .setHTML(popupContent);
+          .setDOMContent(popupContentNode);
 
         // Create marker with anchor center for proper positioning
         const marker = new mapboxgl.Marker({ 
@@ -332,24 +325,7 @@ export default function DashboardMap({
         // Only attach popup in VIEW mode (not ADD_PLACE) to prevent interaction during place addition
         if (mode !== "ADD_PLACE") {
           marker.setPopup(popup);
-          
-          // Add click handler for "Add to List" button if callback is provided
-          if (onAddToList) {
-            // Wait for popup to be added to DOM, then attach click handler
-            popup.on('open', () => {
-              // Use setTimeout to ensure DOM is ready
-              setTimeout(() => {
-                const button = document.getElementById(`add-to-list-${place.id}`);
-                if (button) {
-                  button.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    onAddToList(place);
-                  });
-                }
-              }, 100);
-            });
-          }
+          // Note: "Add to List" button click handler is already attached in buildPlacePopupNode()
         }
 
         if (isHighlighted) {
@@ -453,19 +429,34 @@ export default function DashboardMap({
         .setLngLat([userLocation.lng, userLocation.lat])
         .addTo(map);
 
-      // Add popup with "You are here" text
+      // Add popup with "You are here" text (using safe DOM construction)
+      const userLocationContainer = document.createElement("div");
+      userLocationContainer.style.display = "flex";
+      userLocationContainer.style.flexDirection = "column";
+      userLocationContainer.style.gap = "4px";
+
+      const titleEl = document.createElement("div");
+      titleEl.style.fontSize = "14px";
+      titleEl.style.fontWeight = "600";
+      titleEl.style.color = "#3B82F6";
+      titleEl.textContent = "You are here";
+      userLocationContainer.appendChild(titleEl);
+
+      if (userLocation.accuracy) {
+        const accuracyEl = document.createElement("div");
+        accuracyEl.style.fontSize = "11px";
+        accuracyEl.style.color = "rgba(233, 255, 242, 0.6)";
+        accuracyEl.textContent = `Accuracy: ${Math.round(userLocation.accuracy)}m`;
+        userLocationContainer.appendChild(accuracyEl);
+      }
+
       const popup = new mapboxgl.Popup({
         closeButton: false,
         closeOnClick: true,
         className: "user-location-popup",
         offset: 25,
       })
-        .setHTML(`
-          <div style="display: flex; flex-direction: column; gap: 4px;">
-            <div style="font-size: 14px; font-weight: 600; color: #3B82F6;">You are here</div>
-            ${userLocation.accuracy ? `<div style="font-size: 11px; color: rgba(233, 255, 242, 0.6);">Accuracy: ${Math.round(userLocation.accuracy)}m</div>` : ''}
-          </div>
-        `);
+        .setDOMContent(userLocationContainer);
 
       userLocationMarkerRef.current.setPopup(popup);
     }

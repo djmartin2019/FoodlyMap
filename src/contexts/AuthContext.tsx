@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
+import posthog from "posthog-js";
 
 type AuthState = {
   initialized: boolean;
@@ -24,9 +25,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .getSession()
       .then(({ data, error }) => {
         if (!mounted) return;
-        if (error) console.error("Error getting session:", error);
-        setSession(data.session ?? null);
+        if (error) {
+          if (import.meta.env.DEV) {
+            console.error("Error getting session:", error);
+          }
+        }
+        const session = data.session ?? null;
+        setSession(session);
         setInitialized(true);
+
+        // PostHog: Identify user if session exists on initial load
+        if (session?.user) {
+          try {
+            posthog.identify(session.user.id);
+            if (posthog.people) {
+              posthog.people.set({ beta: true });
+            }
+          } catch (e) {
+            if (import.meta.env.DEV) {
+              console.warn("PostHog identify failed:", e);
+            }
+          }
+        }
       })
       .catch((e) => {
         if (!mounted) return;
@@ -40,6 +60,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!mounted) return;
       setSession(newSession);
       setInitialized(true);
+
+      // PostHog: Identify user on login, reset on logout
+      if (newSession?.user) {
+        try {
+          posthog.identify(newSession.user.id);
+          // Mark as beta user (optional)
+          if (posthog.people) {
+            posthog.people.set({ beta: true });
+          }
+        } catch (e) {
+          // Silently ignore PostHog errors (e.g., blocked by adblock)
+          if (import.meta.env.DEV) {
+            console.warn("PostHog identify failed:", e);
+          }
+        }
+      } else {
+        // User logged out
+        try {
+          posthog.reset();
+        } catch (e) {
+          // Silently ignore PostHog errors
+          if (import.meta.env.DEV) {
+            console.warn("PostHog reset failed:", e);
+          }
+        }
+      }
     });
 
     return () => {
@@ -60,6 +106,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut: async () => {
         // Clear local auth state immediately
         setSession(null);
+        
+        // PostHog: Reset on logout
+        try {
+          posthog.reset();
+        } catch (e) {
+          if (import.meta.env.DEV) {
+            console.warn("PostHog reset failed:", e);
+          }
+        }
         
         // Always clear Supabase localStorage keys first
         // This ensures we clean up even if remote logout fails
