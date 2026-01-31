@@ -3,10 +3,11 @@ import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import { useSearch } from "@tanstack/react-router";
 import DashboardMap, { MapMode, Place } from "../components/DashboardMap";
-import PlaceNameForm from "../components/PlaceNameForm";
+import PlaceNameForm, { GeocodedAddress } from "../components/PlaceNameForm";
 import LocationsTable, { Location } from "../components/LocationsTable";
 import { RequireAuth } from "../components/RequireAuth";
 import AddToListModal from "../components/AddToListModal";
+import { createOrGetPlace } from "../lib/places";
 
 interface Category {
   id: string;
@@ -337,67 +338,11 @@ export default function UserDashboardPage() {
     }
   };
 
-  // TypeScript type for place insert payload (excludes generated columns)
-  type PlaceInsert = {
-    name: string;
-    latitude: number;
-    longitude: number;
-    display_address?: string | null;
-    address_line1?: string | null;
-    city?: string | null;
-    region?: string | null;
-    postal_code?: string | null;
-    country?: string | null;
-    mapbox_place_id?: string | null;
-    geocoded_at?: string | null;
-    created_by?: string | null;
-  };
-
-  // Helper function to create a sanitized place insert payload
-  // Removes generated columns (name_norm, lat_round, lng_round) and read-only columns (id, created_at)
-  const toPlaceInsert = (data: {
-    name: string;
-    latitude: number;
-    longitude: number;
-    display_address?: string | null;
-    address_line1?: string | null;
-    city?: string | null;
-    region?: string | null;
-    postal_code?: string | null;
-    country?: string | null;
-    mapbox_place_id?: string | null;
-    geocoded_at?: string | null;
-    created_by?: string | null;
-  }): PlaceInsert => {
-    return {
-      name: data.name,
-      latitude: data.latitude,
-      longitude: data.longitude,
-      display_address: data.display_address ?? null,
-      address_line1: data.address_line1 ?? null,
-      city: data.city ?? null,
-      region: data.region ?? null,
-      postal_code: data.postal_code ?? null,
-      country: data.country ?? null,
-      mapbox_place_id: data.mapbox_place_id ?? null,
-      geocoded_at: data.geocoded_at ?? null,
-      created_by: data.created_by ?? null,
-    };
-  };
-
-  // Handle form submission - save place with Mapbox Place ID deduplication
+  // Handle form submission - save place with proper deduplication
   const handleSavePlace = async (
     name: string,
     categoryId: string | null,
-    geocodedAddress: {
-      display_address: string;
-      address_line1: string | null;
-      city: string | null;
-      region: string | null;
-      postal_code: string | null;
-      country: string | null;
-      mapbox_place_id: string;
-    } | null
+    geocodedAddress: GeocodedAddress | null
   ) => {
     if (!user || !pendingCoordinates) {
       setError("Missing user or coordinates");
@@ -408,112 +353,51 @@ export default function UserDashboardPage() {
     setError(null);
 
     try {
-      let placeId: string;
-      let placeData: any;
-
-      // Step 1: Check if we have a mapbox_place_id for deduplication
+      // Step 0: Check if user already has this place saved (by mapbox_place_id)
+      // If they do, skip mapbox_place_id deduplication to allow creating a new pin at a different location
+      let shouldSkipMapboxDedupe = false;
       if (geocodedAddress?.mapbox_place_id) {
-        // Check if a place with this mapbox_place_id already exists
-        const { data: existingPlace, error: lookupError } = await supabase
-          .from("places")
-          .select("id, name, latitude, longitude, display_address, created_at")
-          .eq("mapbox_place_id", geocodedAddress.mapbox_place_id)
-          .maybeSingle();
+        const { data: existingUserPlaces } = await supabase
+          .from("user_places")
+          .select("place_id, place:places(mapbox_place_id)")
+          .eq("user_id", user.id);
 
-        if (existingPlace && !lookupError) {
-          // Reuse existing place
-          placeId = existingPlace.id;
-          placeData = existingPlace;
-        } else {
-          // Place doesn't exist, insert new one
-          // Use helper to create sanitized insert payload (excludes generated columns)
-          const placeDataToInsert = toPlaceInsert({
-            name,
-            latitude: pendingCoordinates.lat,
-            longitude: pendingCoordinates.lng,
-            display_address: geocodedAddress.display_address,
-            address_line1: geocodedAddress.address_line1,
-            city: geocodedAddress.city,
-            region: geocodedAddress.region,
-            postal_code: geocodedAddress.postal_code,
-            country: geocodedAddress.country,
-            mapbox_place_id: geocodedAddress.mapbox_place_id,
-            geocoded_at: new Date().toISOString(),
-            created_by: user.id,
+        if (existingUserPlaces) {
+          // Check if any of the user's places have this mapbox_place_id
+          const hasThisPlace = existingUserPlaces.some((up: any) => {
+            const place = up.place;
+            return place && typeof place === 'object' && !Array.isArray(place) && 
+                   place.mapbox_place_id === geocodedAddress.mapbox_place_id;
           });
 
-          const { data: newPlaceData, error: insertError } = await supabase
-            .from("places")
-            .insert([placeDataToInsert])
-            .select()
-            .single();
-
-          if (insertError) {
-            // Handle race condition: if unique constraint violation, try to find existing place
-            if (insertError.code === "23505" || insertError.message?.includes("unique")) {
-              const { data: racePlace, error: raceError } = await supabase
-                .from("places")
-                .select("id, name, latitude, longitude, display_address, created_at")
-                .eq("mapbox_place_id", geocodedAddress.mapbox_place_id)
-                .maybeSingle();
-
-              if (racePlace && !raceError) {
-                // Reuse the place that was created by another request
-                placeId = racePlace.id;
-                placeData = racePlace;
-              } else {
-                if (import.meta.env.DEV) {
-                  console.error("Error finding place after race condition:", raceError);
-                }
-                setError("Failed to save place. Please try again.");
-                setSaving(false);
-                return;
-              }
-            } else {
-              // Log the full error for debugging
-              if (import.meta.env.DEV) {
-                console.error("Error creating place:", insertError);
-                console.error("Place data attempted:", placeDataToInsert);
-              }
-              setError(`Failed to save place: ${insertError.message || "Unknown error"}`);
-              setSaving(false);
-              return;
-            }
-          } else {
-            placeId = newPlaceData.id;
-            placeData = newPlaceData;
+          if (hasThisPlace) {
+            shouldSkipMapboxDedupe = true;
           }
         }
-      } else {
-        // No mapbox_place_id - insert new place without deduplication
-        // Use helper to create sanitized insert payload (excludes generated columns)
-        const placeDataToInsert = toPlaceInsert({
-          name,
-          latitude: pendingCoordinates.lat,
-          longitude: pendingCoordinates.lng,
-          created_by: user.id,
-        });
-
-        const { data: newPlaceData, error: insertError } = await supabase
-          .from("places")
-          .insert([placeDataToInsert])
-          .select()
-          .single();
-
-        if (insertError) {
-          if (import.meta.env.DEV) {
-            console.error("Error creating place:", insertError);
-          }
-          setError("Failed to save place. Please try again.");
-          setSaving(false);
-          return;
-        }
-
-        placeId = newPlaceData.id;
-        placeData = newPlaceData;
       }
 
-      // Step 2: Check if user_places link already exists (prevent duplicates)
+      // Step 1: Create or get existing place using helper function
+      // If user already has this place, pass null for mapbox_place_id to skip that dedupe path
+      const placeData = await createOrGetPlace({
+        name,
+        latitude: pendingCoordinates.lat,
+        longitude: pendingCoordinates.lng,
+        display_address: geocodedAddress?.display_address ?? null,
+        address_line1: geocodedAddress?.address_line1 ?? null,
+        city: geocodedAddress?.city ?? null,
+        region: geocodedAddress?.region ?? null,
+        postal_code: geocodedAddress?.postal_code ?? null,
+        country: geocodedAddress?.country ?? null,
+        // Skip mapbox_place_id dedupe if user already has this place saved
+        mapbox_place_id: shouldSkipMapboxDedupe ? null : (geocodedAddress?.mapbox_place_id ?? null),
+        geocoded_at: geocodedAddress?.mapbox_place_id ? new Date().toISOString() : null,
+        created_by: user.id,
+      });
+
+      const placeId = placeData.id;
+
+      // Step 2: Link place to user via user_places
+      // Check if user_places link already exists (prevent duplicates)
       const { data: existingUserPlace, error: checkError } = await supabase
         .from("user_places")
         .select("id")
@@ -581,11 +465,13 @@ export default function UserDashboardPage() {
       }
 
       // Success: Add new place to local state
+      // Use the clicked coordinates for the pin display, not the existing place's coordinates
+      // This ensures the pin appears where the user clicked, even if we reused an existing place
       const newPlace: Place = {
         id: placeData.id,
         name: placeData.name,
-        latitude: placeData.latitude,
-        longitude: placeData.longitude,
+        latitude: pendingCoordinates.lat,
+        longitude: pendingCoordinates.lng,
         display_address: placeData.display_address || null,
         category_name: categoryId 
           ? categories.find(c => c.id === categoryId)?.name || null
@@ -595,24 +481,39 @@ export default function UserDashboardPage() {
       const newLocation: Location = {
         id: placeData.id,
         name: placeData.name,
-        latitude: placeData.latitude,
-        longitude: placeData.longitude,
+        latitude: pendingCoordinates.lat,
+        longitude: pendingCoordinates.lng,
         category_id: categoryId && categoryId.trim() !== "" ? categoryId : null,
         category_name: categoryId 
           ? categories.find(c => c.id === categoryId)?.name || null
           : null,
-        created_at: placeData.created_at,
+        created_at: placeData.created_at || new Date().toISOString(),
       };
 
-      // Deduplicate: only add if the place doesn't already exist
-      // This prevents duplicate keys in React when the same place is added multiple times
+      // Update local state with the new pin at the clicked location
+      // If the place already exists in local state, update its coordinates to the clicked location
+      // This ensures the pin appears where the user clicked, even if they already have this place saved
       setPlaces(prevPlaces => {
-        const exists = prevPlaces.some(p => p.id === newPlace.id);
-        return exists ? prevPlaces : [...prevPlaces, newPlace];
+        const existingIndex = prevPlaces.findIndex(p => p.id === newPlace.id);
+        if (existingIndex >= 0) {
+          // Update existing place with new coordinates
+          const updated = [...prevPlaces];
+          updated[existingIndex] = newPlace;
+          return updated;
+        }
+        // Add new place
+        return [...prevPlaces, newPlace];
       });
       setLocations(prevLocations => {
-        const exists = prevLocations.some(loc => loc.id === newLocation.id);
-        return exists ? prevLocations : [newLocation, ...prevLocations];
+        const existingIndex = prevLocations.findIndex(loc => loc.id === newLocation.id);
+        if (existingIndex >= 0) {
+          // Update existing location with new coordinates
+          const updated = [...prevLocations];
+          updated[existingIndex] = newLocation;
+          return updated;
+        }
+        // Add new location at the beginning
+        return [newLocation, ...prevLocations];
       });
       
       // Invalidate cache

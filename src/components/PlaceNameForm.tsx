@@ -14,7 +14,10 @@ export interface GeocodedAddress {
   region: string | null;
   postal_code: string | null;
   country: string | null;
-  mapbox_place_id: string;
+  mapbox_place_id: string | null;
+  distance_m?: number | null;
+  place_type?: string | null;
+  feature_center?: { lat: number; lng: number } | null;
 }
 
 interface PlaceNameFormProps {
