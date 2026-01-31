@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Link } from "@tanstack/react-router";
 import mapboxgl from "mapbox-gl";
 import demoLocations from "../data/demoLocations.json";
 
@@ -162,6 +163,30 @@ export default function DashboardPage() {
           <span className="relative z-10">Explore the Map</span>
           <span className="absolute inset-0 rounded-lg bg-accent/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
         </button>
+      </section>
+
+      {/* Closed Beta Banner */}
+      <section className="mb-20">
+        <Link
+          to="/request-access"
+          className="group block rounded-2xl border-2 border-accent/60 bg-gradient-to-br from-accent/10 via-accent/5 to-transparent p-8 shadow-neon-md transition-all duration-300 hover:-translate-y-1 hover:border-accent hover:bg-gradient-to-br hover:from-accent/15 hover:via-accent/10 hover:to-transparent hover:shadow-neon-lg md:p-10"
+        >
+          <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:justify-between sm:text-left">
+            <div className="flex-1">
+              <h2 className="mb-2 text-2xl font-bold text-accent md:text-3xl">
+                Closed beta is live!
+              </h2>
+              <p className="text-base text-text/80 md:text-lg">
+                Request access to Foodly Map and help shape the next features.
+              </p>
+            </div>
+            <div className="shrink-0">
+              <span className="inline-block rounded-lg border-2 border-accent/60 bg-accent/15 px-6 py-3 text-base font-semibold text-accent shadow-glow transition-all duration-300 group-hover:border-accent group-hover:bg-accent/20 group-hover:shadow-glow-lg">
+                Request access
+              </span>
+            </div>
+          </div>
+        </Link>
       </section>
 
       {/* Map Demo Section */}
@@ -485,6 +510,34 @@ export default function DashboardPage() {
                 </tr>
               </tbody>
             </table>
+          </div>
+        </div>
+      </section>
+
+      {/* End of Page CTA */}
+      <section className="mb-12">
+        <div className="rounded-2xl border-2 border-accent/60 bg-gradient-to-br from-accent/10 via-accent/5 to-transparent p-8 shadow-neon-md transition-all duration-300 hover:shadow-neon-lg md:p-12">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="mb-4 text-3xl font-bold text-accent md:text-4xl">
+              Ready to start building your food map?
+            </h2>
+            <p className="mb-8 text-lg text-text/80 md:text-xl">
+              Join the closed beta and start pinning places in seconds.
+            </p>
+            <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
+              <Link
+                to="/request-access"
+                className="group relative rounded-lg border-2 border-accent/60 bg-accent/15 px-8 py-3 text-base font-semibold text-accent shadow-glow transition-all duration-300 hover:-translate-y-0.5 hover:border-accent hover:bg-accent/20 hover:shadow-glow-lg focus:outline-none focus:ring-2 focus:ring-accent/50 focus:ring-offset-2 focus:ring-offset-bg"
+              >
+                Request access
+              </Link>
+              <Link
+                to="/login"
+                className="group relative rounded-lg border-2 border-surface/60 bg-surface/30 px-8 py-3 text-base font-semibold text-text transition-all duration-300 hover:-translate-y-0.5 hover:border-accent/60 hover:bg-surface/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:ring-offset-2 focus:ring-offset-bg"
+              >
+                Sign in
+              </Link>
+            </div>
           </div>
         </div>
       </section>
