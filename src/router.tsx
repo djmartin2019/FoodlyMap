@@ -20,6 +20,7 @@ import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import ListsPage from "./pages/ListsPage";
 import ListDetailPage from "./pages/ListDetailPage";
 import PublicListPage from "./pages/PublicListPage";
+import AuthCallbackPage from "./auth/callbacks/AuthCallbackPage";
 import { RequireAuth } from "./components/RequireAuth";
 import { useAuth } from "./contexts/AuthContext";
 
@@ -68,6 +69,16 @@ const requestAccessRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/request-access",
   component: RequestAccessPage,
+});
+
+// Auth callback route (handles invite links, password reset, etc.)
+const authCallbackRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/auth/callback",
+  component: AuthCallbackPage,
+  validateSearch: (search: Record<string, unknown>) => {
+    return search;
+  },
 });
 
 // Login route (public, but redirects based on onboarding status if already authenticated)
@@ -153,6 +164,7 @@ const routeTree = rootRoute.addChildren([
   privacyRoute,
   loginRoute,
   requestAccessRoute,
+  authCallbackRoute,
   setPasswordRoute,
   resetPasswordRoute,
   userDashboardRoute,

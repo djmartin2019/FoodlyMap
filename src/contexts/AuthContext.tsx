@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 
 type AuthState = {
   initialized: boolean;
+  loading: boolean; // Alias for initialized (for clarity)
   session: Session | null;
   user: User | null;
   signInWithPassword: (email: string, password: string) => Promise<{ error: any }>;
@@ -104,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthState>(() => {
     return {
       initialized,
+      loading: !initialized, // loading is true when not initialized
       session,
       user: session?.user ?? null,
       signInWithPassword: async (email, password) => {

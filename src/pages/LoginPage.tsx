@@ -13,14 +13,18 @@ export default function LoginPage() {
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
 
-  const { user, signInWithPassword } = useAuth();
+  const { user, initialized, signInWithPassword } = useAuth();
   const navigate = useNavigate();
 
+  // Redirect to dashboard if already authenticated (prevent redirect loops)
   useEffect(() => {
-    if (user) {
+    if (initialized && user) {
+      if (import.meta.env.DEV) {
+        console.log("[Login] User already authenticated, redirecting to dashboard");
+      }
       navigate({ to: "/dashboard", replace: true });
     }
-  }, [user, navigate]);  
+  }, [user, initialized, navigate]);  
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();

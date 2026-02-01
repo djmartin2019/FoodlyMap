@@ -5,6 +5,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { RequireAuth } from "../components/RequireAuth";
 
 interface FormErrors {
+  password?: string;
+  confirmPassword?: string;
   username?: string;
   firstName?: string;
   lastName?: string;
@@ -16,6 +18,8 @@ export default function SetPasswordPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [username, setUsername] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -24,7 +28,6 @@ export default function SetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
-  const [profileCreated, setProfileCreated] = useState(false);
 
   // RequireAuth handles auth checking and redirects
   // No need for manual session check here
@@ -67,6 +70,20 @@ export default function SetPasswordPage() {
   // Validate form fields
   const validateForm = async (): Promise<boolean> => {
     const newErrors: FormErrors = {};
+
+    // Password validation
+    if (!password) {
+      newErrors.password = "Password is required";
+    } else if (password.length < 8) {
+      newErrors.password = "Password must be at least 8 characters";
+    }
+
+    // Confirm password validation
+    if (!confirmPassword) {
+      newErrors.confirmPassword = "Please confirm your password";
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match";
+    }
 
     // Username validation
     if (!username) {
@@ -127,18 +144,27 @@ export default function SetPasswordPage() {
         return;
       }
 
-      console.log("Updating password for user:", currentUser.id);
-      console.log("User email:", currentUser.email);
-      console.log("User created at:", currentUser.created_at);
+      if (import.meta.env.DEV) {
+        console.log("[Set Password] Updating password for user:", currentUser.id);
+      }
 
-      // Skip session refresh for invite links - session is already valid
-      console.log("Skipping session refresh (session should already be valid for invite links)");
+      // Step 1: Update password using supabase.auth.updateUser
+      const { error: passwordError } = await supabase.auth.updateUser({
+        password: password,
+      });
 
-      // Step 1: Skip password update for now - it's causing hangs
-      // For invite links, users can set password later via password reset or settings
-      // The important part is creating the profile, which completes onboarding
-      console.log("Skipping password update for invite links (can be set later)");
-      console.log("Proceeding directly to profile creation...");
+      if (passwordError) {
+        if (import.meta.env.DEV) {
+          console.error("[Set Password] Error updating password:", passwordError);
+        }
+        setErrors({ general: passwordError.message || "Failed to update password. Please try again." });
+        setLoading(false);
+        return;
+      }
+
+      if (import.meta.env.DEV) {
+        console.log("[Set Password] Password updated successfully");
+      }
 
       // Step 2: Insert or update profile with onboarding_complete = true
       const profileData = {
@@ -230,7 +256,7 @@ export default function SetPasswordPage() {
         try {
           import("posthog-js").then(({ default: posthog }) => {
             posthog.capture("auth_signed_up", {
-              method: "password",
+              method: "invite",
             });
           });
         } catch (e) {
@@ -238,33 +264,11 @@ export default function SetPasswordPage() {
         }
       }
 
-      // Step 3: Send password reset email via Supabase
-      console.log("Sending password reset email...");
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        currentUser.email!,
-        {
-          redirectTo: `${window.location.origin}/login`,
-        }
-      );
-
-      if (resetError) {
-        console.error("Error sending password reset email:", resetError);
-        // Don't block - profile is created, user can request password reset later
-        setErrors({
-          general: "Profile created, but password reset email failed to send. You can request a password reset from the login page.",
-        });
-        setLoading(false);
-        return;
+      // Success: Navigate to dashboard
+      if (import.meta.env.DEV) {
+        console.log("[Set Password] Onboarding complete, navigating to dashboard");
       }
-
-      console.log("Password reset email sent successfully");
-
-      // Show success message, then redirect to login
-      setProfileCreated(true);
-      setLoading(false);
-      
-      // Redirect to login immediately (no countdown needed)
-      navigate({ to: "/login", replace: true, search: {} });
+      navigate({ to: "/dashboard", replace: true });
     } catch (err) {
       console.error("Unexpected error in form submission:", err);
       setErrors({
@@ -310,43 +314,68 @@ export default function SetPasswordPage() {
     <RequireAuth>
       <div className="mx-auto flex min-h-[calc(100vh-200px)] w-full max-w-md items-center justify-center px-6 py-12">
         <div className="w-full rounded-2xl border border-surface/60 bg-surface/30 p-8 shadow-neon-sm md:p-12">
-        {profileCreated ? (
-          <div className="text-center">
-            <div className="mb-6">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border-2 border-accent/60 bg-accent/10">
-                <svg className="h-8 w-8 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h1 className="mb-2 text-3xl font-bold tracking-tight text-accent md:text-4xl">
-                Profile Created!
-              </h1>
-              <p className="mb-4 text-base text-text/80">
-                We've sent a password reset link to your email.
-              </p>
-              <p className="text-sm text-text/60">
-                Please check your inbox and click the link to set your password. Once you've set your password, you'll be able to sign in.
-              </p>
-            </div>
-            <button
-              onClick={() => navigate({ to: "/login", replace: true, search: {} })}
-              className="w-full rounded-lg border-2 border-accent/60 bg-surface/80 px-6 py-3 text-base font-semibold text-accent shadow-glow transition-all duration-300 hover:-translate-y-0.5 hover:border-accent hover:bg-accent/10 hover:shadow-glow-lg"
-            >
-              Go to Sign In Now
-            </button>
+          <div className="mb-8 text-center">
+            <h1 className="mb-2 text-3xl font-bold tracking-tight text-accent md:text-4xl">
+              Set Your Password
+            </h1>
+            <p className="text-sm text-text/70">
+              Create your password and complete your profile to get started.
+            </p>
           </div>
-        ) : (
-          <>
-            <div className="mb-8 text-center">
-              <h1 className="mb-2 text-3xl font-bold tracking-tight text-accent md:text-4xl">
-                Complete Your Profile
-              </h1>
-              <p className="text-sm text-text/70">
-                Create your account profile. We'll send you a password reset link to set your password.
-              </p>
-            </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Password */}
+          <div>
+            <label htmlFor="password" className="mb-2 block text-sm font-medium text-text">
+              Password <span className="text-text/50">(required)</span>
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setErrors((prev) => ({ ...prev, password: undefined }));
+              }}
+              required
+              autoComplete="new-password"
+              disabled={loading}
+              className="w-full rounded-lg border border-surface/60 bg-bg/40 px-4 py-3 text-text placeholder:text-text/40 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
+              placeholder="Enter your password"
+            />
+            {errors.password && (
+              <p className="mt-1 text-xs text-red-400">{errors.password}</p>
+            )}
+            {!errors.password && password && (
+              <p className="mt-1 text-xs text-text/50">
+                Must be at least 8 characters
+              </p>
+            )}
+          </div>
+
+          {/* Confirm Password */}
+          <div>
+            <label htmlFor="confirmPassword" className="mb-2 block text-sm font-medium text-text">
+              Confirm Password <span className="text-text/50">(required)</span>
+            </label>
+            <input
+              id="confirmPassword"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                setErrors((prev) => ({ ...prev, confirmPassword: undefined }));
+              }}
+              required
+              autoComplete="new-password"
+              disabled={loading}
+              className="w-full rounded-lg border border-surface/60 bg-bg/40 px-4 py-3 text-text placeholder:text-text/40 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
+              placeholder="Confirm your password"
+            />
+            {errors.confirmPassword && (
+              <p className="mt-1 text-xs text-red-400">{errors.confirmPassword}</p>
+            )}
+          </div>
 
           {/* Username */}
           <div>
@@ -474,11 +503,9 @@ export default function SetPasswordPage() {
                 disabled={loading || checkingUsername}
                 className="w-full rounded-lg border-2 border-accent/60 bg-surface/80 px-6 py-3 text-base font-semibold text-accent shadow-glow transition-all duration-300 hover:-translate-y-0.5 hover:border-accent hover:bg-accent/10 hover:shadow-glow-lg disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {loading ? "Creating Account..." : "Create Account"}
+                {loading ? "Setting up account..." : "Complete Setup"}
               </button>
             </form>
-          </>
-        )}
         </div>
       </div>
     </RequireAuth>
