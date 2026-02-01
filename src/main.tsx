@@ -1,6 +1,7 @@
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./index.css";
 
+import * as Sentry from "@sentry/react";
 import { RouterProvider } from "@tanstack/react-router";
 import { PostHogProvider } from "posthog-js/react";
 import React from "react";
@@ -9,6 +10,35 @@ import ReactDOM from "react-dom/client";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { AuthProvider } from "./contexts/AuthContext";
 import { router } from "./router";
+
+// Sentry configuration
+const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+    // Setting this option to true will send default PII data to Sentry.
+    // For example, automatic IP address collection on events
+    sendDefaultPii: true,
+    // Environment (development, staging, production)
+    environment: import.meta.env.MODE,
+    // Release tracking (useful for tracking which version has errors)
+    release: import.meta.env.VITE_APP_VERSION || undefined,
+    // Integrate with React Router for better error context
+    integrations: [
+      Sentry.browserTracingIntegration(),
+      Sentry.replayIntegration({
+        // Session Replay for debugging (can be expensive, use selectively)
+        maskAllText: true,
+        blockAllMedia: true,
+      }),
+    ],
+    // Performance monitoring
+    tracesSampleRate: import.meta.env.PROD ? 0.1 : 1.0, // 10% in prod, 100% in dev
+    // Session Replay sample rate (lower in prod to reduce costs)
+    replaysSessionSampleRate: import.meta.env.PROD ? 0.1 : 1.0,
+    replaysOnErrorSampleRate: 1.0, // Always capture replays on errors
+  });
+}
 
 // PostHog configuration
 const posthogKey = import.meta.env.VITE_PUBLIC_POSTHOG_KEY;

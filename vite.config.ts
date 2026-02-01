@@ -6,7 +6,8 @@ export default defineConfig({
   build: {
     // Optimize build output for production
     minify: "esbuild",
-    sourcemap: false, // Disable sourcemaps in production for smaller bundle
+    // Enable sourcemaps for Sentry error tracking (Sentry will upload them separately)
+    sourcemap: true,
     rollupOptions: {
       output: {
         // Optimize chunk splitting for better caching

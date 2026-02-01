@@ -18,6 +18,7 @@
     "lint-staged": "lint-staged"
   },
   "dependencies": {
+    "@sentry/react": "^10.38.0",
     "@supabase/supabase-js": "^2.91.1",
     "@tanstack/react-router": "^1.91.1",
     "@tanstack/react-table": "^8.21.3",

@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react";
 import { Component, ErrorInfo, ReactNode } from "react";
 
 import { log } from "../lib/log";
@@ -31,6 +32,15 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log error in dev mode (redacted to prevent PII exposure)
     log.error("ErrorBoundary caught an error:", error, errorInfo);
+    
+    // Send to Sentry for production error tracking
+    Sentry.captureException(error, {
+      contexts: {
+        react: {
+          componentStack: errorInfo.componentStack,
+        },
+      },
+    });
   }
 
   handleReload = () => {

@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react";
 import type { Session, User } from "@supabase/supabase-js";
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
@@ -37,6 +38,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setInitialized(true);
 
+        // Sentry: Set user context for error tracking
+        if (session?.user) {
+          Sentry.setUser({
+            id: session.user.id,
+            email: session.user.email,
+            // Don't include sensitive data like phone numbers
+          });
+        } else {
+          Sentry.setUser(null);
+        }
+
         // PostHog: Identify user if session exists on initial load
         // Use dynamic import to avoid initializing PostHog before PostHogProvider
         if (session?.user) {
@@ -67,6 +79,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!mounted) return;
       setSession(newSession);
       setInitialized(true);
+
+      // Sentry: Set user context for error tracking
+      if (newSession?.user) {
+        Sentry.setUser({
+          id: newSession.user.id,
+          email: newSession.user.email,
+          // Don't include sensitive data like phone numbers
+        });
+      } else {
+        Sentry.setUser(null);
+      }
 
       // PostHog: Identify user on login, reset on logout
       // Use dynamic import to avoid initializing PostHog before PostHogProvider
@@ -118,6 +141,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut: async () => {
         // Clear local auth state immediately
         setSession(null);
+        
+        // Sentry: Clear user context on logout
+        Sentry.setUser(null);
         
         // PostHog: Reset on logout
         // Use dynamic import to avoid initializing PostHog before PostHogProvider
