@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import { validatePassword, validatePasswordConfirm } from "../lib/validation/password";
+import { log } from "../lib/log";
 
 interface FormErrors {
   password?: string;
@@ -28,14 +29,14 @@ export default function ResetPasswordPage() {
 
     if (!session) {
       // No session means the recovery link is invalid or expired
-      console.error("No active session for password reset");
-      console.error("This usually means the recovery link has expired or was already used");
+      log.error("No active session for password reset");
+      log.error("This usually means the recovery link has expired or was already used");
       navigate({ to: "/login", replace: true });
       return;
     }
 
     // Session exists - allow user to reset password
-    console.log("Recovery session found, allowing password reset");
+    log.log("Recovery session found, allowing password reset");
     setCheckingSession(false);
   }, [initialized, session, navigate]);
 
@@ -78,9 +79,7 @@ export default function ResetPasswordPage() {
       });
 
       if (updateError) {
-        if (import.meta.env.DEV) {
-          console.error("[Reset Password] Password update error:", updateError);
-        }
+        log.error("[Reset Password] Password update error:", updateError);
         
         // Map common Supabase auth errors to friendly messages
         let errorMessage = "Failed to update password. Please try again.";
@@ -106,27 +105,27 @@ export default function ResetPasswordPage() {
         return;
       }
 
-      console.log("Password updated successfully");
+      log.log("Password updated successfully");
 
       // Step 2: Sign out to invalidate the recovery session (non-blocking)
       // This prevents limbo states and ensures clean auth state
       // Fire and forget - don't wait for it to complete
       supabase.auth.signOut()
         .then(() => {
-          console.log("Signed out successfully");
+          log.log("Signed out successfully");
         })
         .catch((signOutError: any) => {
-          console.warn("Sign out error (non-blocking):", signOutError);
+          log.warn("Sign out error (non-blocking):", signOutError);
         });
 
       // Step 3: Redirect immediately to login page
       // Don't wait for signOut - redirect right away
       // Use window.location for hard redirect to ensure it always happens
       // This clears any remaining state and ensures clean navigation
-      console.log("Redirecting to login...");
+      log.log("Redirecting to login...");
       window.location.href = "/login";
     } catch (err) {
-      console.error("Unexpected error during password reset:", err);
+      log.error("Unexpected error during password reset:", err);
       setErrors({
         general: "An unexpected error occurred. Please try again.",
       });

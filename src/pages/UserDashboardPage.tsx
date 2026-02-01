@@ -8,6 +8,7 @@ import LocationsTable, { Location } from "../components/LocationsTable";
 import { RequireAuth } from "../components/RequireAuth";
 import AddToListModal from "../components/AddToListModal";
 import { createOrGetPlace } from "../lib/places";
+import { log } from "../lib/log";
 
 interface Category {
   id: string;
@@ -68,9 +69,7 @@ export default function UserDashboardPage() {
         .order("name");
 
       if (fetchError) {
-        if (import.meta.env.DEV) {
-          console.error("Error fetching categories:", fetchError);
-        }
+        log.error("Error fetching categories:", fetchError);
         return;
       }
 
@@ -88,7 +87,7 @@ export default function UserDashboardPage() {
       }
     } catch (err) {
       if (import.meta.env.DEV) {
-        console.error("Unexpected error loading categories:", err);
+        log.error("Unexpected error loading categories:", err);
       }
     }
   }, [user]);
@@ -156,7 +155,7 @@ export default function UserDashboardPage() {
 
       if (fetchError) {
         if (import.meta.env.DEV) {
-          console.error("Error fetching places:", fetchError);
+          log.error("Error fetching places:", fetchError);
         }
         if (setLoadingState) {
           setError("Failed to load places");
@@ -252,7 +251,7 @@ export default function UserDashboardPage() {
       
       if (setLoadingState) setLoading(false);
     } catch (err) {
-      console.error("Unexpected error loading places:", err);
+      log.error("Unexpected error loading places:", err);
       if (setLoadingState) {
         setError("An unexpected error occurred");
         setLoading(false);
@@ -407,7 +406,7 @@ export default function UserDashboardPage() {
 
       if (checkError && checkError.code !== "PGRST116") {
         if (import.meta.env.DEV) {
-          console.error("Error checking user_places:", checkError);
+          log.error("Error checking user_places:", checkError);
         }
         setError("Failed to save place. Please try again.");
         setSaving(false);
@@ -442,7 +441,7 @@ export default function UserDashboardPage() {
             // Already exists - that's fine, continue
           } else {
             if (import.meta.env.DEV) {
-              console.error("Error linking place to user:", linkError);
+              log.error("Error linking place to user:", linkError);
             }
             setError("Failed to link place to your account. Please try again.");
             setSaving(false);
@@ -535,7 +534,7 @@ export default function UserDashboardPage() {
       setError(null);
     } catch (err) {
       if (import.meta.env.DEV) {
-        console.error("Unexpected error saving place:", err);
+        log.error("Unexpected error saving place:", err);
       }
       setError("An unexpected error occurred. Please try again.");
       setSaving(false);
@@ -567,7 +566,7 @@ export default function UserDashboardPage() {
       
       if (checkError || !userPlaceCheck) {
         if (import.meta.env.DEV) {
-          console.error("User does not have access to this place:", checkError);
+          log.error("User does not have access to this place:", checkError);
         }
         throw new Error("You do not have permission to update this location");
       }
@@ -581,7 +580,7 @@ export default function UserDashboardPage() {
 
       if (placeUpdateError) {
         if (import.meta.env.DEV) {
-          console.error("Error updating place name:", placeUpdateError);
+          log.error("Error updating place name:", placeUpdateError);
         }
         throw new Error(placeUpdateError.message || "Failed to update place name");
       }
@@ -606,7 +605,7 @@ export default function UserDashboardPage() {
 
       if (userPlaceUpdateError) {
         if (import.meta.env.DEV) {
-          console.error("Error updating user_places category:", userPlaceUpdateError);
+          log.error("Error updating user_places category:", userPlaceUpdateError);
         }
         throw new Error(userPlaceUpdateError.message || "Failed to update category");
       }
@@ -651,13 +650,13 @@ export default function UserDashboardPage() {
       // Refetch in background to ensure consistency (don't await, don't set loading state)
       loadLocations(false).catch(err => {
         if (import.meta.env.DEV) {
-          console.error("Error refetching locations after update:", err);
+          log.error("Error refetching locations after update:", err);
         }
         // If refetch fails, we still have the optimistic update
       });
     } catch (err) {
       if (import.meta.env.DEV) {
-        console.error("Unexpected error updating location:", err);
+        log.error("Unexpected error updating location:", err);
       }
       throw err;
     }
@@ -745,7 +744,7 @@ export default function UserDashboardPage() {
 
       if (deleteError) {
         if (import.meta.env.DEV) {
-          console.error("Error deleting user_places link:", deleteError);
+          log.error("Error deleting user_places link:", deleteError);
         }
         throw new Error("Failed to delete location");
       }
@@ -772,13 +771,13 @@ export default function UserDashboardPage() {
       // Refetch in background to ensure consistency (don't await, don't set loading state)
       loadLocations(false).catch(err => {
         if (import.meta.env.DEV) {
-          console.error("Error refetching locations after delete:", err);
+          log.error("Error refetching locations after delete:", err);
         }
         // If refetch fails, we still have the optimistic update
       });
     } catch (err) {
       if (import.meta.env.DEV) {
-        console.error("Unexpected error deleting location:", err);
+        log.error("Unexpected error deleting location:", err);
       }
       // Revert optimistic update on error
       await loadLocations();

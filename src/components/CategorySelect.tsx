@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
+import { log } from "../lib/log";
 
 interface Category {
   id: string;
@@ -99,7 +100,7 @@ export default function CategorySelect({
         .single();
 
       if (error) {
-        console.error("Error creating category:", error);
+        log.error("Error creating category:", error);
         setCreatingError("Failed to create category. Please try again.");
         setIsCreatingCategory(false);
         return;
@@ -118,7 +119,7 @@ export default function CategorySelect({
       setNewCategoryName("");
       setCreatingError(null);
     } catch (err) {
-      console.error("Unexpected error creating category:", err);
+      log.error("Unexpected error creating category:", err);
       setCreatingError("An unexpected error occurred");
     } finally {
       setIsCreatingCategory(false);

@@ -8,6 +8,7 @@
  */
 
 import { supabase } from "./supabase";
+import { log } from "./log";
 
 export interface PlaceInsertData {
   name: string;
@@ -61,7 +62,7 @@ async function findPlaceByMapboxId(
 
   if (error) {
     if (import.meta.env.DEV) {
-      console.error("Error finding place by mapbox_place_id:", error);
+      log.error("Error finding place by mapbox_place_id:", error);
     }
     return null;
   }
@@ -91,7 +92,7 @@ async function findPlaceByFallback(
 
   if (error) {
     if (import.meta.env.DEV) {
-      console.error("Error finding place by fallback:", error);
+      log.error("Error finding place by fallback:", error);
     }
     return null;
   }
@@ -218,15 +219,15 @@ export async function createOrGetPlace(
 
       // If we still can't find it, something went wrong
       if (import.meta.env.DEV) {
-        console.error("[Place Create] Race condition but couldn't find existing place:", insertError);
+        log.error("[Place Create] Race condition but couldn't find existing place:", insertError);
       }
       throw new Error("Failed to create place due to conflict. Please try again.");
     }
 
     // Other errors
     if (import.meta.env.DEV) {
-      console.error("[Place Create] Error creating place:", insertError);
-      console.error("[Place Create] Place data attempted:", placeDataToInsert);
+      log.error("[Place Create] Error creating place:", insertError);
+      log.error("[Place Create] Place data attempted:", placeDataToInsert);
     }
     throw new Error(`Failed to create place: ${insertError.message || "Unknown error"}`);
   }

@@ -2,6 +2,7 @@ import { useState, FormEvent, useEffect } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
+import { log } from "../lib/log";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -19,9 +20,7 @@ export default function LoginPage() {
   // Redirect to dashboard if already authenticated (prevent redirect loops)
   useEffect(() => {
     if (initialized && user) {
-      if (import.meta.env.DEV) {
-        console.log("[Login] User already authenticated, redirecting to dashboard");
-      }
+      log.log("[Login] User already authenticated, redirecting to dashboard");
       navigate({ to: "/dashboard", replace: true });
     }
   }, [user, initialized, navigate]);  
@@ -68,7 +67,7 @@ export default function LoginPage() {
       setForgotPasswordSent(true);
       setForgotPasswordLoading(false);
     } catch (err) {
-      console.error("Error sending password reset:", err);
+      log.error("Error sending password reset:", err);
       setError("An unexpected error occurred. Please try again.");
       setForgotPasswordLoading(false);
     }

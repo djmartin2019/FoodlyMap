@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { RequireAuth } from "../components/RequireAuth";
 import { validatePassword, validatePasswordConfirm } from "../lib/validation/password";
+import { log } from "../lib/log";
 
 interface FormErrors {
   password?: string;
@@ -54,14 +55,14 @@ export default function SetPasswordPage() {
 
       if (error && error.code !== "PGRST116") {
         // PGRST116 is "no rows returned" which is fine
-        console.error("Error checking username:", error);
+        log.error("Error checking username:", error);
         return false;
       }
 
       // If data exists, username is taken
       return !data || data.length === 0;
     } catch (err) {
-      console.error("Error checking username:", err);
+      log.error("Error checking username:", err);
       return false;
     } finally {
       setCheckingUsername(false);
@@ -136,16 +137,14 @@ export default function SetPasswordPage() {
       } = await supabase.auth.getUser();
 
       if (getUserError || !currentUser) {
-        console.error("Error getting user:", getUserError);
+        log.error("Error getting user:", getUserError);
         setErrors({ general: "Session expired. Please try again." });
         setLoading(false);
         navigate({ to: "/login" });
         return;
       }
 
-      if (import.meta.env.DEV) {
-        console.log("[Set Password] Updating password for user:", currentUser.id);
-      }
+        log.log("[Set Password] Updating password for user:", currentUser.id);
 
       // Step 1: Update password using supabase.auth.updateUser
       const { error: passwordError } = await supabase.auth.updateUser({
@@ -153,9 +152,7 @@ export default function SetPasswordPage() {
       });
 
       if (passwordError) {
-        if (import.meta.env.DEV) {
-          console.error("[Set Password] Error updating password:", passwordError);
-        }
+        log.error("[Set Password] Error updating password:", passwordError);
         
         // Map common Supabase auth errors to friendly messages
         let errorMessage = "Failed to update password. Please try again.";
@@ -176,9 +173,7 @@ export default function SetPasswordPage() {
         return;
       }
 
-      if (import.meta.env.DEV) {
-        console.log("[Set Password] Password updated successfully");
-      }
+        log.log("[Set Password] Password updated successfully");
 
       // Step 2: Insert or update profile with onboarding_complete = true
       const profileData = {
@@ -192,14 +187,14 @@ export default function SetPasswordPage() {
         created_at: new Date().toISOString(),
       };
 
-      console.log("Creating profile:", profileData);
+      log.log("Creating profile:", profileData);
 
       // Session should be valid (we're in RequireAuth wrapper)
       // No need to verify again - auth context already ensures session exists
-      console.log("Proceeding with profile creation...");
+      log.log("Proceeding with profile creation...");
 
       // Step 2: Create profile
-      console.log("Creating profile...");
+      log.log("Creating profile...");
       
       let profileError;
       try {
@@ -211,14 +206,14 @@ export default function SetPasswordPage() {
           profileError = insertError;
         }
       } catch (err: any) {
-        console.error("Profile creation exception:", err);
+        log.error("Profile creation exception:", err);
         profileError = err;
       }
 
       if (profileError) {
-        console.error("Profile creation error:", profileError);
-        console.error("Error code:", profileError.code);
-        console.error("Error message:", profileError.message);
+        log.error("Profile creation error:", profileError);
+        log.error("Error code:", profileError.code);
+        log.error("Error message:", profileError.message);
         
         // Handle unique constraint violation (username or id)
         if (
@@ -231,7 +226,7 @@ export default function SetPasswordPage() {
             setErrors({ username: "This username is already taken. Please choose another." });
           } else {
             // ID conflict - profile might already exist, try UPDATE instead
-            console.log("Profile exists, trying UPDATE...");
+            log.log("Profile exists, trying UPDATE...");
             const { error: updateError } = await supabase
               .from("profiles")
               .update({
@@ -245,14 +240,14 @@ export default function SetPasswordPage() {
               .eq("id", profileData.id);
 
             if (updateError) {
-              console.error("Profile update also failed:", updateError);
+              log.error("Profile update also failed:", updateError);
               setErrors({
                 general: `Failed to save profile: ${updateError.message || "Please try again."}`,
               });
               setLoading(false);
               return;
             }
-            console.log("Profile updated successfully");
+            log.log("Profile updated successfully");
           }
         } else {
           setErrors({
@@ -263,7 +258,7 @@ export default function SetPasswordPage() {
         }
       } else {
         if (import.meta.env.DEV) {
-          console.log("Profile created successfully");
+          log.log("Profile created successfully");
         }
         
         // PostHog: Track signup (profile creation indicates new account)
@@ -280,11 +275,11 @@ export default function SetPasswordPage() {
 
       // Success: Navigate to dashboard
       if (import.meta.env.DEV) {
-        console.log("[Set Password] Onboarding complete, navigating to dashboard");
+        log.log("[Set Password] Onboarding complete, navigating to dashboard");
       }
       navigate({ to: "/dashboard", replace: true });
     } catch (err) {
-      console.error("Unexpected error in form submission:", err);
+      log.error("Unexpected error in form submission:", err);
       setErrors({
         general: `An unexpected error occurred: ${err instanceof Error ? err.message : "Please try again."}`,
       });

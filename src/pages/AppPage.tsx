@@ -3,6 +3,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "../lib/supabase";
 import DashboardMap from "../components/DashboardMap";
+import { log } from "../lib/log";
 
 interface Profile {
   id: string;
@@ -37,7 +38,7 @@ export default function AppPage() {
           .single();
 
         if (profileError) {
-          console.error("Error fetching profile:", profileError);
+          log.error("Error fetching profile:", profileError);
           setError("Failed to load profile information");
           setLoading(false);
           return;
@@ -46,7 +47,7 @@ export default function AppPage() {
         setProfile(data);
         setLoading(false);
       } catch (err) {
-        console.error("Unexpected error fetching profile:", err);
+        log.error("Unexpected error fetching profile:", err);
         setError("An unexpected error occurred");
         setLoading(false);
       }

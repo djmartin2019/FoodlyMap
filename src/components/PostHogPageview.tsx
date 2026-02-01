@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { usePostHog } from "posthog-js/react";
+import { log } from "../lib/log";
 
 /**
  * Tracks SPA pageviews for TanStack Router
@@ -31,9 +32,7 @@ export function PostHogPageview() {
       });
     } catch (error) {
       // Silently ignore PostHog errors (e.g., blocked by adblock, network issues)
-      if (import.meta.env.DEV) {
-        console.warn("PostHog pageview capture failed:", error);
-      }
+      log.warn("PostHog pageview capture failed:", error);
     }
   }, [posthog, location.pathname, location.search]);
 

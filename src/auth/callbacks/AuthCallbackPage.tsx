@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useNavigate, useSearch } from "@tanstack/react-router";
+import { log } from "../../lib/log";
 
 export default function AuthCallbackPage() {
   const navigate = useNavigate();
@@ -17,14 +18,12 @@ export default function AuthCallbackPage() {
     let cancelled = false;
 
     async function run() {
-      if (import.meta.env.DEV) {
-        console.log("[Auth Callback] Starting auth callback handler", {
-          hasTokenHash: !!search?.token_hash,
-          hasCode: !!search?.code,
-          type: search?.type,
-          next: search?.next,
-        });
-      }
+      log.log("[Auth Callback] Starting auth callback handler", {
+        hasTokenHash: !!search?.token_hash,
+        hasCode: !!search?.code,
+        type: search?.type,
+        next: search?.next,
+      });
 
       // Clean up URL immediately to prevent re-triggering
       if (!cancelled) {
@@ -38,9 +37,7 @@ export default function AuthCallbackPage() {
 
       // Handle PKCE code exchange (preferred method)
       if (search?.code) {
-        if (import.meta.env.DEV) {
-          console.log("[Auth Callback] Exchanging PKCE code for session");
-        }
+        log.log("[Auth Callback] Exchanging PKCE code for session");
         if (!cancelled) {
           setStatus("Verifying authentication code...");
         }
@@ -49,24 +46,18 @@ export default function AuthCallbackPage() {
         
         if (exchangeError) {
           sessionError = exchangeError;
-          if (import.meta.env.DEV) {
-            console.error("[Auth Callback] Error exchanging code for session:", exchangeError);
-          }
+          log.error("[Auth Callback] Error exchanging code for session:", exchangeError);
         } else {
           session = data.session;
-          if (import.meta.env.DEV) {
-            console.log("[Auth Callback] PKCE code exchange successful, session established");
-          }
+          log.log("[Auth Callback] PKCE code exchange successful, session established");
         }
       }
       // Handle token_hash verification (fallback for invite links)
       else if (search?.token_hash && search?.type) {
-        if (import.meta.env.DEV) {
-          console.log("[Auth Callback] Verifying OTP with token_hash", {
-            type: search.type,
-            hasTokenHash: !!search.token_hash,
-          });
-        }
+        log.log("[Auth Callback] Verifying OTP with token_hash", {
+          type: search.type,
+          hasTokenHash: !!search.token_hash,
+        });
         if (!cancelled) {
           setStatus("Verifying invitation...");
         }
@@ -78,21 +69,15 @@ export default function AuthCallbackPage() {
 
         if (verifyError) {
           sessionError = verifyError;
-          if (import.meta.env.DEV) {
-            console.error("[Auth Callback] Error verifying OTP:", verifyError);
-          }
+          log.error("[Auth Callback] Error verifying OTP:", verifyError);
         } else {
           session = data.session;
-          if (import.meta.env.DEV) {
-            console.log("[Auth Callback] OTP verification successful, session established");
-          }
+          log.log("[Auth Callback] OTP verification successful, session established");
         }
       }
       // Fallback: try getSession (handles hash-based tokens when detectSessionInUrl is true)
       else {
-        if (import.meta.env.DEV) {
-          console.log("[Auth Callback] No code or token_hash, trying getSession");
-        }
+        log.log("[Auth Callback] No code or token_hash, trying getSession");
         if (!cancelled) {
           setStatus("Checking for existing session...");
         }
@@ -101,25 +86,19 @@ export default function AuthCallbackPage() {
         
         if (getSessionError) {
           sessionError = getSessionError;
-          if (import.meta.env.DEV) {
-            console.error("[Auth Callback] Error getting session:", getSessionError);
-          }
+          log.error("[Auth Callback] Error getting session:", getSessionError);
         } else {
           session = sessionData.session;
-          if (import.meta.env.DEV) {
-            console.log("[Auth Callback] Session found via getSession");
-          }
+          log.log("[Auth Callback] Session found via getSession");
         }
       }
 
       // Handle errors
       if (sessionError || !session) {
-        if (import.meta.env.DEV) {
-          console.error("[Auth Callback] Authentication failed:", {
-            error: sessionError,
-            hasSession: !!session,
-          });
-        }
+        log.error("[Auth Callback] Authentication failed:", {
+          error: sessionError,
+          hasSession: !!session,
+        });
         if (!cancelled) {
           setError(
             sessionError?.message || 
@@ -137,9 +116,7 @@ export default function AuthCallbackPage() {
 
       const user = session.user;
 
-      if (import.meta.env.DEV) {
-        console.log("[Auth Callback] Session established for user:", user.id);
-      }
+      log.log("[Auth Callback] Session established for user:", user.id);
 
       // Ensure profile exists
       if (!cancelled) {
@@ -156,16 +133,12 @@ export default function AuthCallbackPage() {
 
         if (profileError && profileError.code !== "PGRST116") {
           // PGRST116 is "no rows returned" which is fine
-          if (import.meta.env.DEV) {
-            console.error("[Auth Callback] Error checking profile:", profileError);
-          }
+          log.error("[Auth Callback] Error checking profile:", profileError);
         }
 
         // Create profile if it doesn't exist
         if (!profileData) {
-          if (import.meta.env.DEV) {
-            console.log("[Auth Callback] Profile not found, creating minimal profile");
-          }
+          log.log("[Auth Callback] Profile not found, creating minimal profile");
 
           const { error: insertError } = await supabase
             .from("profiles")
@@ -178,28 +151,20 @@ export default function AuthCallbackPage() {
           if (insertError) {
             // If insert fails due to unique constraint, profile might have been created by another request
             // This is fine - continue with navigation
-            if (import.meta.env.DEV) {
-              if (insertError.code === "23505") {
-                console.log("[Auth Callback] Profile already exists (race condition)");
-              } else {
-                console.error("[Auth Callback] Error creating profile:", insertError);
-              }
+            if (insertError.code === "23505") {
+              log.log("[Auth Callback] Profile already exists (race condition)");
+            } else {
+              log.error("[Auth Callback] Error creating profile:", insertError);
             }
           } else {
-            if (import.meta.env.DEV) {
-              console.log("[Auth Callback] Profile created successfully");
-            }
+            log.log("[Auth Callback] Profile created successfully");
           }
         } else {
-          if (import.meta.env.DEV) {
-            console.log("[Auth Callback] Profile already exists");
-          }
+          log.log("[Auth Callback] Profile already exists");
         }
       } catch (err) {
         // Don't block navigation if profile creation fails
-        if (import.meta.env.DEV) {
-          console.error("[Auth Callback] Unexpected error ensuring profile:", err);
-        }
+        log.error("[Auth Callback] Unexpected error ensuring profile:", err);
       }
 
       // Determine next route
@@ -232,15 +197,13 @@ export default function AuthCallbackPage() {
           nextRoute = "/reset-password";
         }
 
-        if (import.meta.env.DEV) {
-          console.log("[Auth Callback] Navigation decision:", {
-            type: search?.type,
-            nextParam: search?.next,
-            isInviteFlow,
-            isRecoveryFlow,
-            finalRoute: nextRoute,
-          });
-        }
+        log.log("[Auth Callback] Navigation decision:", {
+          type: search?.type,
+          nextParam: search?.next,
+          isInviteFlow,
+          isRecoveryFlow,
+          finalRoute: nextRoute,
+        });
 
         setStatus("Redirecting...");
         navigate({ to: nextRoute, replace: true });

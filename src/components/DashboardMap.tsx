@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import { buildPlacePopupNode } from "../lib/safeDom";
+import { log } from "../lib/log";
 
 export type MapMode = "VIEW" | "ADD_PLACE";
 
@@ -87,9 +88,7 @@ export default function DashboardMap({
     // Get Mapbox access token from environment variable
     const token = import.meta.env.VITE_MAPBOX_TOKEN;
     if (!token) {
-      if (import.meta.env.DEV) {
-        console.warn("VITE_MAPBOX_TOKEN not found in environment variables");
-      }
+      log.warn("VITE_MAPBOX_TOKEN not found in environment variables");
       return;
     }
 

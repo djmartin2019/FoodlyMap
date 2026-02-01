@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import { RequireAuth } from "../components/RequireAuth";
+import { log } from "../lib/log";
 
 interface Profile {
   id: string;
@@ -58,7 +59,7 @@ export default function ProfilePage() {
         .single();
 
       if (profileError) {
-        console.error("Error fetching profile:", profileError);
+        log.error("Error fetching profile:", profileError);
         setError("Failed to load profile information");
         setLoading(false);
         return;
@@ -78,7 +79,7 @@ export default function ProfilePage() {
       
       setLoading(false);
     } catch (err) {
-      console.error("Unexpected error fetching profile:", err);
+      log.error("Unexpected error fetching profile:", err);
       setError("An unexpected error occurred");
       setLoading(false);
     }

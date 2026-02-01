@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import { logoutAndCleanup } from "../lib/logout";
+import { log } from "../lib/log";
 
 type AuthState = {
   initialized: boolean;
@@ -28,7 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!mounted) return;
         if (error) {
           if (import.meta.env.DEV) {
-            console.error("Error getting session:", error);
+            log.error("Error getting session:", error);
           }
         }
         const session = data.session ?? null;
@@ -55,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       .catch((e) => {
         if (!mounted) return;
-        console.error("getSession error:", e);
+        log.error("getSession error:", e);
         setSession(null);
         setInitialized(true);
       });

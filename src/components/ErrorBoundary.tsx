@@ -1,4 +1,5 @@
 import { Component, ErrorInfo, ReactNode } from "react";
+import { log } from "../lib/log";
 
 interface Props {
   children: ReactNode;
@@ -27,10 +28,8 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error in dev mode
-    if (import.meta.env.DEV) {
-      console.error("ErrorBoundary caught an error:", error, errorInfo);
-    }
+    // Log error in dev mode (redacted to prevent PII exposure)
+    log.error("ErrorBoundary caught an error:", error, errorInfo);
   }
 
   handleReload = () => {

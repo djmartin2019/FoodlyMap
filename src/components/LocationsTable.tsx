@@ -12,6 +12,7 @@ import {
 import EditLocationModal from "./EditLocationModal";
 import DeleteConfirmationDialog from "./DeleteConfirmationDialog";
 import AddToListModal from "./AddToListModal";
+import { log } from "../lib/log";
 
 export interface Location {
   id: string;
@@ -250,7 +251,7 @@ export default function LocationsTable({
         setEditingLocation(null);
         setActionError(null);
       } catch (err) {
-        console.error("Error updating location:", err);
+        log.error("Error updating location:", err);
         setActionError("Failed to update location. Please try again.");
         throw err;
       } finally {

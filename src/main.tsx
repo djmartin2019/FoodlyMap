@@ -14,7 +14,8 @@ const posthogHost = import.meta.env.VITE_PUBLIC_POSTHOG_HOST;
 
 // Warn in dev if PostHog is not configured
 if (import.meta.env.DEV && !posthogKey) {
-  console.warn("PostHog analytics not configured: VITE_PUBLIC_POSTHOG_KEY is missing");
+  // PostHog not configured - this is expected in some environments
+  // No need to log in production
 }
 
 /**

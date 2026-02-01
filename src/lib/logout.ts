@@ -5,6 +5,8 @@
  * Always clears local state even if remote signOut fails.
  */
 
+import { log } from "./log";
+
 import { supabase } from "./supabase";
 import { clearGeocodeCache } from "./mapbox";
 
@@ -41,14 +43,12 @@ function clearAppLocalStorage(): void {
       }
     });
     
-    if (import.meta.env.DEV && keysToRemove.length > 0) {
-      console.log(`[Logout] Cleared ${keysToRemove.length} app localStorage keys`);
+    if (keysToRemove.length > 0) {
+      log.log(`[Logout] Cleared ${keysToRemove.length} app localStorage keys`);
     }
   } catch (e) {
     // Ignore localStorage errors
-    if (import.meta.env.DEV) {
-      console.warn("[Logout] Error clearing app localStorage:", e);
-    }
+    log.warn("[Logout] Error clearing app localStorage:", e);
   }
 }
 
@@ -95,14 +95,12 @@ function clearSupabaseAuthTokens(): void {
       }
     });
     
-    if (import.meta.env.DEV && keysToRemove.length > 0) {
-      console.log(`[Logout] Cleared ${keysToRemove.length} Supabase auth tokens`);
+    if (keysToRemove.length > 0) {
+      log.log(`[Logout] Cleared ${keysToRemove.length} Supabase auth tokens`);
     }
   } catch (e) {
     // Ignore localStorage errors
-    if (import.meta.env.DEV) {
-      console.warn("[Logout] Error clearing Supabase auth tokens:", e);
-    }
+    log.warn("[Logout] Error clearing Supabase auth tokens:", e);
   }
 }
 
@@ -138,14 +136,12 @@ function clearAppSessionStorage(): void {
       }
     });
     
-    if (import.meta.env.DEV && keysToRemove.length > 0) {
-      console.log(`[Logout] Cleared ${keysToRemove.length} app sessionStorage keys`);
+    if (keysToRemove.length > 0) {
+      log.log(`[Logout] Cleared ${keysToRemove.length} app sessionStorage keys`);
     }
   } catch (e) {
     // Ignore sessionStorage errors
-    if (import.meta.env.DEV) {
-      console.warn("[Logout] Error clearing app sessionStorage:", e);
-    }
+    log.warn("[Logout] Error clearing app sessionStorage:", e);
   }
 }
 
@@ -157,14 +153,10 @@ function clearInMemoryCaches(): void {
     // Clear reverse geocoding cache
     clearGeocodeCache();
     
-    if (import.meta.env.DEV) {
-      console.log("[Logout] Cleared in-memory caches");
-    }
+    log.log("[Logout] Cleared in-memory caches");
   } catch (e) {
     // Ignore cache clearing errors
-    if (import.meta.env.DEV) {
-      console.warn("[Logout] Error clearing in-memory caches:", e);
-    }
+    log.warn("[Logout] Error clearing in-memory caches:", e);
   }
 }
 
@@ -213,12 +205,12 @@ export function verifyLogoutCleanup(): void {
     }
     
     if (remainingKeys.localStorage.length > 0 || remainingKeys.sessionStorage.length > 0) {
-      console.warn("[Logout Verification] Remaining keys found:", remainingKeys);
+      log.warn("[Logout Verification] Remaining keys found:", remainingKeys);
     } else {
-      console.log("[Logout Verification] ✓ All app keys cleared successfully");
+      log.log("[Logout Verification] ✓ All app keys cleared successfully");
     }
   } catch (e) {
-    console.warn("[Logout Verification] Error verifying cleanup:", e);
+    log.warn("[Logout Verification] Error verifying cleanup:", e);
   }
 }
 
@@ -231,22 +223,16 @@ export function verifyLogoutCleanup(): void {
  * @param navigate - Optional navigation function (if provided, navigates to /login after cleanup)
  */
 export async function logoutAndCleanup(navigate?: (to: string) => void): Promise<void> {
-  if (import.meta.env.DEV) {
-    console.log("[Logout] Starting logout and cleanup");
-  }
+  log.log("[Logout] Starting logout and cleanup");
   
   try {
     // Attempt remote logout (but don't block on errors)
     try {
       await supabase.auth.signOut({ scope: "global" });
-      if (import.meta.env.DEV) {
-        console.log("[Logout] Remote signOut successful");
-      }
+      log.log("[Logout] Remote signOut successful");
     } catch (signOutError: any) {
       // Log but don't block - we'll clean up locally anyway
-      if (import.meta.env.DEV) {
-        console.warn("[Logout] Remote signOut failed (non-blocking):", signOutError);
-      }
+      log.warn("[Logout] Remote signOut failed (non-blocking):", signOutError);
     }
   } finally {
     // Always run cleanup, regardless of signOut success/failure
@@ -264,13 +250,9 @@ export async function logoutAndCleanup(navigate?: (to: string) => void): Promise
     clearInMemoryCaches();
     
     // 5. DEV-only verification
-    if (import.meta.env.DEV) {
-      verifyLogoutCleanup();
-    }
+    verifyLogoutCleanup();
     
-    if (import.meta.env.DEV) {
-      console.log("[Logout] Cleanup complete");
-    }
+    log.log("[Logout] Cleanup complete");
     
     // 6. Navigate to login if navigate function provided
     if (navigate) {

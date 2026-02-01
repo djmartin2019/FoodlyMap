@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "../lib/supabase";
+import { log } from "../lib/log";
 
 interface Profile {
   id: string;
@@ -36,12 +37,12 @@ export default function DashboardPage() {
           .single();
 
         if (error) {
-          console.error("Error fetching profile:", error);
+          log.error("Error fetching profile:", error);
         } else {
           setProfile(data);
         }
       } catch (err) {
-        console.error("Error fetching profile:", err);
+        log.error("Error fetching profile:", err);
       } finally {
         setLoading(false);
       }

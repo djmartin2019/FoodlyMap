@@ -5,6 +5,8 @@
  * Selects the best feature based on distance and type (prefers address features).
  */
 
+import { log } from "./log";
+
 export interface ReverseGeocodeResult {
   display_address: string;
   address_line1: string | null;
@@ -158,7 +160,7 @@ export async function reverseGeocode({
   // Check token availability (log warning only once)
   if (!token) {
     if (!tokenWarningLogged) {
-      console.warn(
+      log.warn(
         "VITE_MAPBOX_TOKEN is not set. Reverse geocoding will be disabled."
       );
       tokenWarningLogged = true;
