@@ -258,7 +258,7 @@ export async function reverseGeocode({
     // Cache the result
     geocodeCache.set(cacheKey, result);
     return result;
-  } catch (error) {
+  } catch {
     // Fail silently - don't log errors
     geocodeCache.set(cacheKey, null);
     return null;

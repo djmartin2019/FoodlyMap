@@ -1,10 +1,11 @@
-import { useState, FormEvent, useEffect, useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { supabase } from "../lib/supabase";
-import { useAuth } from "../contexts/AuthContext";
+import { FormEvent, useCallback,useEffect, useState } from "react";
+
 import { RequireAuth } from "../components/RequireAuth";
-import { validatePassword, validatePasswordConfirm } from "../lib/validation/password";
+import { useAuth } from "../contexts/AuthContext";
 import { log } from "../lib/log";
+import { supabase } from "../lib/supabase";
+import { validatePassword, validatePasswordConfirm } from "../lib/validation/password";
 
 interface FormErrors {
   password?: string;

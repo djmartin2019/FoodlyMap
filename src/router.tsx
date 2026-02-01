@@ -1,28 +1,29 @@
 import {
-  Link,
-  Outlet,
   createRootRoute,
   createRoute,
   createRouter,
+  Link,
+  Outlet,
   useNavigate
 } from "@tanstack/react-router";
-import { PostHogPageview } from "./components/PostHogPageview";
-import DashboardPage from "./pages/DashboardPage";
-import ContactPage from "./pages/ContactPage";
-import LoginPage from "./pages/LoginPage";
-import UserDashboardPage from "./pages/UserDashboardPage";
-import ProfilePage from "./pages/ProfilePage";
-import RequestAccessPage from "./pages/RequestAccessPage";
-import SetPasswordPage from "./pages/SetPasswordPage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
-import TermsPage from "./pages/TermsPage";
-import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
-import ListsPage from "./pages/ListsPage";
-import ListDetailPage from "./pages/ListDetailPage";
-import PublicListPage from "./pages/PublicListPage";
+
 import AuthCallbackPage from "./auth/callbacks/AuthCallbackPage";
+import { PostHogPageview } from "./components/PostHogPageview";
 import { RequireAuth } from "./components/RequireAuth";
 import { useAuth } from "./contexts/AuthContext";
+import ContactPage from "./pages/ContactPage";
+import DashboardPage from "./pages/DashboardPage";
+import ListDetailPage from "./pages/ListDetailPage";
+import ListsPage from "./pages/ListsPage";
+import LoginPage from "./pages/LoginPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import ProfilePage from "./pages/ProfilePage";
+import PublicListPage from "./pages/PublicListPage";
+import RequestAccessPage from "./pages/RequestAccessPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import SetPasswordPage from "./pages/SetPasswordPage";
+import TermsPage from "./pages/TermsPage";
+import UserDashboardPage from "./pages/UserDashboardPage";
 
 // Root route with layout
 const rootRoute = createRootRoute({

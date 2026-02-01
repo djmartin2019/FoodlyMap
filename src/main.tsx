@@ -1,12 +1,14 @@
+import "mapbox-gl/dist/mapbox-gl.css";
+import "./index.css";
+
+import { RouterProvider } from "@tanstack/react-router";
+import { PostHogProvider } from "posthog-js/react";
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { PostHogProvider } from "posthog-js/react";
-import { AuthProvider } from "./contexts/AuthContext";
-import { RouterProvider } from "@tanstack/react-router";
-import { router } from "./router";
+
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import "./index.css";
-import "mapbox-gl/dist/mapbox-gl.css";
+import { AuthProvider } from "./contexts/AuthContext";
+import { router } from "./router";
 
 // PostHog configuration
 const posthogKey = import.meta.env.VITE_PUBLIC_POSTHOG_KEY;

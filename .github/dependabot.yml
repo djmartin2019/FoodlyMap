@@ -1,0 +1,26 @@
+version: 2
+updates:
+  # npm dependencies in root
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    # Group minor and patch updates together for efficiency
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      development-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+    # Allow major updates but don't group them (review individually)
+    ignore:
+      # Ignore major updates for now - review manually
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"

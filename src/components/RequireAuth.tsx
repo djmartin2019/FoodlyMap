@@ -1,6 +1,7 @@
-import React, { useEffect } from "react";
-import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "@tanstack/react-router";
+import React, { useEffect } from "react";
+
+import { useAuth } from "../contexts/AuthContext";
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
     const { initialized, session } = useAuth();

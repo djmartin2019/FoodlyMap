@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "@tanstack/react-router";
-import { supabase } from "../lib/supabase";
+import { useEffect, useState } from "react";
+
 import DashboardMap from "../components/DashboardMap";
+import { useAuth } from "../contexts/AuthContext";
 import { log } from "../lib/log";
+import { supabase } from "../lib/supabase";
 
 interface Profile {
   id: string;

@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import mapboxgl from "mapbox-gl";
+import { useEffect, useRef } from "react";
+
 import demoLocations from "../data/demoLocations.json";
 
 interface DemoLocation {

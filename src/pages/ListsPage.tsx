@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { Link } from "@tanstack/react-router";
+import { FormEvent, useEffect, useState } from "react";
+
+import { RequireAuth } from "../components/RequireAuth";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
-import { RequireAuth } from "../components/RequireAuth";
-import { Link } from "@tanstack/react-router";
 
 interface List {
   id: string;
@@ -64,7 +65,7 @@ export default function ListsPage() {
   }, [user]);
 
   // Handle create list
-  const handleCreateList = async (e: React.FormEvent) => {
+  const handleCreateList = async (e: FormEvent) => {
     e.preventDefault();
     if (!user) return;
 

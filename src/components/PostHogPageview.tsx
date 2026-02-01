@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { usePostHog } from "posthog-js/react";
+import { useEffect, useRef } from "react";
+
 import { log } from "../lib/log";
 
 /**

@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from "react";
+import { ChangeEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
+
 import { useAuth } from "../contexts/AuthContext";
-import { supabase } from "../lib/supabase";
 import { log } from "../lib/log";
+import { supabase } from "../lib/supabase";
 
 interface Category {
   id: string;
@@ -44,7 +45,7 @@ export default function CategorySelect({
   }, [isCreating]);
 
   // Handle select change
-  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleSelectChange = (e: ChangeEvent<HTMLSelectElement>) => {
     const selectedValue = e.target.value;
     
     if (selectedValue === "__create_new__") {
@@ -146,7 +147,7 @@ export default function CategorySelect({
   };
 
   // Handle input keydown
-  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleInputKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
       handleCreateCategory();

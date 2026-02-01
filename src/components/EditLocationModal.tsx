@@ -1,6 +1,7 @@
-import { useState, FormEvent, useEffect } from "react";
-import { Location } from "./LocationsTable";
+import { FormEvent, useEffect,useState } from "react";
+
 import CategorySelect from "./CategorySelect";
+import { Location } from "./LocationsTable";
 
 interface Category {
   id: string;

@@ -1,13 +1,13 @@
-import { useState, useMemo } from "react";
 import {
-  useReactTable,
+  type ColumnDef,
+  flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
-  flexRender,
-  type ColumnDef,
   type SortingState,
+  useReactTable,
 } from "@tanstack/react-table";
+import { useMemo,useState } from "react";
 
 export interface ListPlaceRow {
   list_place_id: string;

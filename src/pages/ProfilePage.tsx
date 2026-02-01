@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback } from "react";
-import { useAuth } from "../contexts/AuthContext";
-import { supabase } from "../lib/supabase";
+import { useCallback,useEffect, useState } from "react";
+
 import { RequireAuth } from "../components/RequireAuth";
+import { useAuth } from "../contexts/AuthContext";
 import { log } from "../lib/log";
+import { supabase } from "../lib/supabase";
 
 interface Profile {
   id: string;

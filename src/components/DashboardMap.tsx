@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
-import { buildPlacePopupNode } from "../lib/safeDom";
+import { useEffect, useRef } from "react";
+
 import { log } from "../lib/log";
+import { buildPlacePopupNode } from "../lib/safeDom";
 
 export type MapMode = "VIEW" | "ADD_PLACE";
 

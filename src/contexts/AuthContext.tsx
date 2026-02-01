@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabase";
-import { logoutAndCleanup } from "../lib/logout";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+
 import { log } from "../lib/log";
+import { logoutAndCleanup } from "../lib/logout";
+import { supabase } from "../lib/supabase";
 
 type AuthState = {
   initialized: boolean;

@@ -6,9 +6,8 @@
  */
 
 import { log } from "./log";
-
-import { supabase } from "./supabase";
 import { clearGeocodeCache } from "./mapbox";
+import { supabase } from "./supabase";
 
 /**
  * Clear all app-specific data from localStorage

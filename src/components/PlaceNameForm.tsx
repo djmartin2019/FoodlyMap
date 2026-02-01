@@ -1,6 +1,7 @@
-import { useState, FormEvent, useEffect, useRef } from "react";
-import CategorySelect from "./CategorySelect";
+import { FormEvent, useEffect, useRef,useState } from "react";
+
 import { reverseGeocode } from "../lib/mapbox";
+import CategorySelect from "./CategorySelect";
 
 interface Category {
   id: string;
@@ -48,7 +49,7 @@ export default function PlaceNameForm({
   const [error, setError] = useState<string | null>(null);
   const [geocodedAddress, setGeocodedAddress] = useState<GeocodedAddress | null>(null);
   const [geocoding, setGeocoding] = useState(false);
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reverse geocode when coordinates are available
   useEffect(() => {

@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
-import { useParams, Link } from "@tanstack/react-router";
-import { useAuth } from "../contexts/AuthContext";
-import { supabase } from "../lib/supabase";
-import { RequireAuth } from "../components/RequireAuth";
+import { Link,useParams } from "@tanstack/react-router";
+import { useEffect, useMemo,useState } from "react";
+
 import AddSavedPlaceToListModal from "../components/AddSavedPlaceToListModal";
 import ListPlacesTable, { ListPlaceRow } from "../components/ListPlacesTable";
+import { RequireAuth } from "../components/RequireAuth";
+import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../lib/supabase";
 
 interface Place {
   id: string;

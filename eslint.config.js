@@ -74,11 +74,11 @@ export default tseslint.config(
       "simple-import-sort/exports": "error",
       // TypeScript handles module resolution
       "import/no-unresolved": "off",
-      // Disable overly strict React hooks rules (too noisy for legacy code)
-      "react-hooks/set-state-in-effect": "off",
+      // React hooks rules
+      "react-hooks/set-state-in-effect": "off", // Too strict for modal reset patterns
       "react-hooks/incompatible-library": "off",
-      // Downgrade to warnings for gradual adoption
-      "react-hooks/exhaustive-deps": "warn",
+      "react-hooks/exhaustive-deps": "warn", // Warn initially for gradual adoption
+      // Accessibility rules - set to warnings initially to keep CI green
       "jsx-a11y/no-static-element-interactions": "warn",
       "jsx-a11y/click-events-have-key-events": "warn",
       "jsx-a11y/label-has-associated-control": "warn",

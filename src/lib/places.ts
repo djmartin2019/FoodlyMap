@@ -7,8 +7,8 @@
  * 3. Never inserts generated columns (name_norm, lat_round, lng_round)
  */
 
-import { supabase } from "./supabase";
 import { log } from "./log";
+import { supabase } from "./supabase";
 
 export interface PlaceInsertData {
   name: string;

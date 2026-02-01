@@ -1,18 +1,19 @@
-import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
-  useReactTable,
+  type ColumnDef,
+  flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
-  flexRender,
-  type ColumnDef,
   type SortingState,
+  useReactTable,
 } from "@tanstack/react-table";
-import EditLocationModal from "./EditLocationModal";
-import DeleteConfirmationDialog from "./DeleteConfirmationDialog";
-import AddToListModal from "./AddToListModal";
+import { useCallback,useMemo, useState } from "react";
+
 import { log } from "../lib/log";
+import AddToListModal from "./AddToListModal";
+import DeleteConfirmationDialog from "./DeleteConfirmationDialog";
+import EditLocationModal from "./EditLocationModal";
 
 export interface Location {
   id: string;
@@ -68,7 +69,7 @@ function TableToolbar({
   onClearFilters: () => void;
 }) {
   const [searchValue, setSearchValue] = useState(globalFilter);
-  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSearchChange = (value: string) => {
     setSearchValue(value);
@@ -470,11 +471,13 @@ export default function LocationsTable({
                       }`}
                     >
                       {header.isPlaceholder ? null : (
-                        <div
+                        <button
+                          type="button"
                           className={`flex items-center gap-1 ${
                             header.column.getCanSort() ? "cursor-pointer select-none" : ""
                           }`}
                           onClick={header.column.getToggleSortingHandler()}
+                          disabled={!header.column.getCanSort()}
                         >
                           {flexRender(header.column.columnDef.header, header.getContext())}
                           {header.column.getCanSort() && (
@@ -485,7 +488,7 @@ export default function LocationsTable({
                               }[header.column.getIsSorted() as string] ?? " ⇅"}
                             </span>
                           )}
-                        </div>
+                        </button>
                       )}
                     </th>
                   ))}

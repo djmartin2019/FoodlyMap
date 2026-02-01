@@ -1,14 +1,15 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { useAuth } from "../contexts/AuthContext";
-import { supabase } from "../lib/supabase";
 import { useSearch } from "@tanstack/react-router";
-import DashboardMap, { MapMode, Place } from "../components/DashboardMap";
-import PlaceNameForm, { GeocodedAddress } from "../components/PlaceNameForm";
-import LocationsTable, { Location } from "../components/LocationsTable";
-import { RequireAuth } from "../components/RequireAuth";
+import { useCallback, useEffect, useMemo,useState } from "react";
+
 import AddToListModal from "../components/AddToListModal";
-import { createOrGetPlace } from "../lib/places";
+import DashboardMap, { MapMode, Place } from "../components/DashboardMap";
+import LocationsTable, { Location } from "../components/LocationsTable";
+import PlaceNameForm, { GeocodedAddress } from "../components/PlaceNameForm";
+import { RequireAuth } from "../components/RequireAuth";
+import { useAuth } from "../contexts/AuthContext";
 import { log } from "../lib/log";
+import { createOrGetPlace } from "../lib/places";
+import { supabase } from "../lib/supabase";
 
 interface Category {
   id: string;
