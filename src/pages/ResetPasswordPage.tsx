@@ -2,6 +2,7 @@ import { useState, FormEvent, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
+import { validatePassword, validatePasswordConfirm } from "../lib/validation/password";
 
 interface FormErrors {
   password?: string;
@@ -38,20 +39,20 @@ export default function ResetPasswordPage() {
     setCheckingSession(false);
   }, [initialized, session, navigate]);
 
-  // Validate form
+  // Validate form (using shared helper to match Supabase policy)
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
 
-    if (!password) {
-      newErrors.password = "Password is required";
-    } else if (password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
+    // Password validation
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      newErrors.password = passwordError;
     }
 
-    if (!confirmPassword) {
-      newErrors.confirmPassword = "Please confirm your password";
-    } else if (password !== confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
+    // Confirm password validation
+    const confirmError = validatePasswordConfirm(password, confirmPassword);
+    if (confirmError) {
+      newErrors.confirmPassword = confirmError;
     }
 
     setErrors(newErrors);
@@ -77,14 +78,25 @@ export default function ResetPasswordPage() {
       });
 
       if (updateError) {
-        console.error("Password update error:", updateError);
+        if (import.meta.env.DEV) {
+          console.error("[Reset Password] Password update error:", updateError);
+        }
         
-        // Handle specific error cases with user-friendly messages
-        let errorMessage = updateError.message || "Failed to update password. Please try again.";
+        // Map common Supabase auth errors to friendly messages
+        let errorMessage = "Failed to update password. Please try again.";
         
-        if (updateError.message?.includes("different from the old password") || 
-            updateError.message?.includes("same as")) {
+        const errorMsg = updateError.message?.toLowerCase() || "";
+        
+        if (errorMsg.includes("password") && errorMsg.includes("length")) {
+          errorMessage = "Password must be at least 8 characters.";
+        } else if (errorMsg.includes("different from the old password") || 
+                   errorMsg.includes("same as")) {
           errorMessage = "New password must be different from your current password. Please choose a different password.";
+        } else if (errorMsg.includes("invalid") || errorMsg.includes("expired")) {
+          errorMessage = "This reset link is invalid or has expired. Please request a new password reset.";
+        } else if (updateError.message) {
+          // Use original message if it's already user-friendly
+          errorMessage = updateError.message;
         }
         
         setErrors({
@@ -159,17 +171,36 @@ export default function ResetPasswordPage() {
               type="password"
               value={password}
               onChange={(e) => {
-                setPassword(e.target.value);
-                setErrors((prev) => ({ ...prev, password: undefined }));
+                const newPassword = e.target.value;
+                setPassword(newPassword);
+                // Validate on change for immediate feedback
+                const passwordError = validatePassword(newPassword);
+                setErrors((prev) => ({
+                  ...prev,
+                  password: passwordError || undefined,
+                }));
+              }}
+              onBlur={() => {
+                // Re-validate on blur to ensure error shows if user leaves field
+                const passwordError = validatePassword(password);
+                setErrors((prev) => ({
+                  ...prev,
+                  password: passwordError || undefined,
+                }));
               }}
               required
               autoComplete="new-password"
               disabled={loading}
               className="w-full rounded-lg border border-surface/60 bg-bg/40 px-4 py-3 text-text placeholder:text-text/40 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
-              placeholder="At least 6 characters"
+              placeholder="At least 8 characters"
             />
             {errors.password && (
               <p className="mt-1 text-xs text-red-400">{errors.password}</p>
+            )}
+            {!errors.password && password && (
+              <p className="mt-1 text-xs text-text/50">
+                Must be at least 8 characters
+              </p>
             )}
           </div>
 
@@ -183,8 +214,22 @@ export default function ResetPasswordPage() {
               type="password"
               value={confirmPassword}
               onChange={(e) => {
-                setConfirmPassword(e.target.value);
-                setErrors((prev) => ({ ...prev, confirmPassword: undefined }));
+                const newConfirm = e.target.value;
+                setConfirmPassword(newConfirm);
+                // Validate on change for immediate feedback
+                const confirmError = validatePasswordConfirm(password, newConfirm);
+                setErrors((prev) => ({
+                  ...prev,
+                  confirmPassword: confirmError || undefined,
+                }));
+              }}
+              onBlur={() => {
+                // Re-validate on blur
+                const confirmError = validatePasswordConfirm(password, confirmPassword);
+                setErrors((prev) => ({
+                  ...prev,
+                  confirmPassword: confirmError || undefined,
+                }));
               }}
               required
               autoComplete="new-password"
@@ -207,7 +252,7 @@ export default function ResetPasswordPage() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !!errors.password || !!errors.confirmPassword}
             className="w-full rounded-lg border-2 border-accent/60 bg-surface/80 px-6 py-3 text-base font-semibold text-accent shadow-glow transition-all duration-300 hover:-translate-y-0.5 hover:border-accent hover:bg-accent/10 hover:shadow-glow-lg disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? "Updating Password..." : "Update Password"}

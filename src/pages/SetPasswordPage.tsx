@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { RequireAuth } from "../components/RequireAuth";
+import { validatePassword, validatePasswordConfirm } from "../lib/validation/password";
 
 interface FormErrors {
   password?: string;
@@ -71,18 +72,16 @@ export default function SetPasswordPage() {
   const validateForm = async (): Promise<boolean> => {
     const newErrors: FormErrors = {};
 
-    // Password validation
-    if (!password) {
-      newErrors.password = "Password is required";
-    } else if (password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters";
+    // Password validation (using shared helper to match Supabase policy)
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      newErrors.password = passwordError;
     }
 
     // Confirm password validation
-    if (!confirmPassword) {
-      newErrors.confirmPassword = "Please confirm your password";
-    } else if (password !== confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
+    const confirmError = validatePasswordConfirm(password, confirmPassword);
+    if (confirmError) {
+      newErrors.confirmPassword = confirmError;
     }
 
     // Username validation
@@ -157,7 +156,22 @@ export default function SetPasswordPage() {
         if (import.meta.env.DEV) {
           console.error("[Set Password] Error updating password:", passwordError);
         }
-        setErrors({ general: passwordError.message || "Failed to update password. Please try again." });
+        
+        // Map common Supabase auth errors to friendly messages
+        let errorMessage = "Failed to update password. Please try again.";
+        
+        const errorMsg = passwordError.message?.toLowerCase() || "";
+        
+        if (errorMsg.includes("password") && errorMsg.includes("length")) {
+          errorMessage = "Password must be at least 8 characters.";
+        } else if (errorMsg.includes("invalid") || errorMsg.includes("expired")) {
+          errorMessage = "This link is invalid or has expired. Please request a new invitation.";
+        } else if (passwordError.message) {
+          // Use original message if it's already user-friendly
+          errorMessage = passwordError.message;
+        }
+        
+        setErrors({ general: errorMessage });
         setLoading(false);
         return;
       }
@@ -334,8 +348,22 @@ export default function SetPasswordPage() {
               type="password"
               value={password}
               onChange={(e) => {
-                setPassword(e.target.value);
-                setErrors((prev) => ({ ...prev, password: undefined }));
+                const newPassword = e.target.value;
+                setPassword(newPassword);
+                // Validate on change for immediate feedback
+                const passwordError = validatePassword(newPassword);
+                setErrors((prev) => ({
+                  ...prev,
+                  password: passwordError || undefined,
+                }));
+              }}
+              onBlur={() => {
+                // Re-validate on blur to ensure error shows if user leaves field
+                const passwordError = validatePassword(password);
+                setErrors((prev) => ({
+                  ...prev,
+                  password: passwordError || undefined,
+                }));
               }}
               required
               autoComplete="new-password"
@@ -363,8 +391,22 @@ export default function SetPasswordPage() {
               type="password"
               value={confirmPassword}
               onChange={(e) => {
-                setConfirmPassword(e.target.value);
-                setErrors((prev) => ({ ...prev, confirmPassword: undefined }));
+                const newConfirm = e.target.value;
+                setConfirmPassword(newConfirm);
+                // Validate on change for immediate feedback
+                const confirmError = validatePasswordConfirm(password, newConfirm);
+                setErrors((prev) => ({
+                  ...prev,
+                  confirmPassword: confirmError || undefined,
+                }));
+              }}
+              onBlur={() => {
+                // Re-validate on blur
+                const confirmError = validatePasswordConfirm(password, confirmPassword);
+                setErrors((prev) => ({
+                  ...prev,
+                  confirmPassword: confirmError || undefined,
+                }));
               }}
               required
               autoComplete="new-password"
@@ -500,7 +542,7 @@ export default function SetPasswordPage() {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={loading || checkingUsername}
+                disabled={loading || checkingUsername || !!errors.password || !!errors.confirmPassword}
                 className="w-full rounded-lg border-2 border-accent/60 bg-surface/80 px-6 py-3 text-base font-semibold text-accent shadow-glow transition-all duration-300 hover:-translate-y-0.5 hover:border-accent hover:bg-accent/10 hover:shadow-glow-lg disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? "Setting up account..." : "Complete Setup"}
