@@ -18,8 +18,8 @@
     "lint-staged": "lint-staged"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.91.1",
-    "@tanstack/react-router": "^1.91.1",
+    "@supabase/supabase-js": "^2.93.3",
+    "@tanstack/react-router": "^1.157.18",
     "@tanstack/react-table": "^8.21.3",
     "mapbox-gl": "^3.8.0",
     "posthog-js": "^1.336.4",
