@@ -191,7 +191,7 @@ function RootLayout() {
 
   const handleSignOut = async () => {
     // signOut now handles all errors internally and never throws
-    // It will clear local state and attempt remote logout if session exists
+    // It will clear local state, storage, and caches via logoutAndCleanup
     await signOut();
     
     // Always navigate to login after sign out

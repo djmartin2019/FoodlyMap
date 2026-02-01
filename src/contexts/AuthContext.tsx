@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
+import { logoutAndCleanup } from "../lib/logout";
 
 type AuthState = {
   initialized: boolean;
@@ -129,71 +130,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Silently ignore if PostHog is not available
         });
         
-        // Always clear Supabase localStorage keys first
-        // This ensures we clean up even if remote logout fails
-        try {
-          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-          if (supabaseUrl) {
-            // Extract project ref from URL (e.g., https://xxxxx.supabase.co -> xxxxx)
-            const urlMatch = supabaseUrl.match(/https?:\/\/([^.]+)/);
-            const projectRef = urlMatch?.[1];
-            
-            if (projectRef) {
-              const keysToRemove: string[] = [];
-              for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && (
-                  key.startsWith(`sb-${projectRef}-`) || 
-                  key.startsWith("supabase.auth.token") ||
-                  (key.includes("supabase") && key.includes("auth"))
-                )) {
-                  keysToRemove.push(key);
-                }
-              }
-              keysToRemove.forEach(key => {
-                try {
-                  localStorage.removeItem(key);
-                } catch (e) {
-                  // Ignore individual key removal errors
-                }
-              });
-            }
-          }
-        } catch (e) {
-          // Ignore localStorage errors - sign out should still succeed
-        }
-        
-        // Attempt remote logout only if we have a valid, non-expired session
-        try {
-          const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-          
-          // Only attempt remote logout if:
-          // 1. No error getting session
-          // 2. Session exists
-          // 3. Access token exists
-          // 4. Token is not expired (check expires_at if available)
-          if (!sessionError && sessionData?.session?.access_token) {
-            const session = sessionData.session;
-            const isExpired = session.expires_at 
-              ? session.expires_at * 1000 < Date.now() 
-              : false;
-            
-            if (!isExpired) {
-              try {
-                // Use local scope - signs out current device only
-                await supabase.auth.signOut({ scope: "local" });
-                // Silently ignore errors - we've already cleared local state
-                // Common errors: 403 (session invalid), AuthSessionMissingError
-              } catch (err: any) {
-                // Silently ignore expected errors (403, AuthSessionMissingError)
-                // These happen when session is already invalid/expired
-                // No need to log - this is expected behavior
-              }
-            }
-          }
-        } catch (getSessionError) {
-          // Silently ignore - session check failed, we've already cleared local state
-        }
+        // Use comprehensive logout cleanup
+        // This handles remote signOut, localStorage, sessionStorage, and caches
+        // Navigation is handled by the caller (router.tsx, etc.)
+        await logoutAndCleanup();
       },
     };
   }, [initialized, session]);

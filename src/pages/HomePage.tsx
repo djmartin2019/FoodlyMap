@@ -52,6 +52,7 @@ export default function DashboardPage() {
 
   const handleSignOut = async () => {
     // signOut now handles all errors internally and never throws
+    // It will clear local state, storage, and caches via logoutAndCleanup
     await signOut();
     // Use hard redirect to ensure all state is cleared
     window.location.href = "/login";

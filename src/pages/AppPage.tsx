@@ -57,6 +57,7 @@ export default function AppPage() {
 
   const handleSignOut = async () => {
     // signOut now handles all errors internally and never throws
+    // It will clear local state, storage, and caches via logoutAndCleanup
     await signOut();
     // Always navigate after sign out
     navigate({ to: "/login", replace: true });
