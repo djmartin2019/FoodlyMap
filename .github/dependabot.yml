@@ -5,7 +5,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "09:00"
     open-pull-requests-limit: 10
+    # Prioritize security updates - they are created immediately, not on schedule
     # Group minor and patch updates together for efficiency
     groups:
       production-dependencies:
