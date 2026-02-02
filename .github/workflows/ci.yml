@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [staging]
   pull_request:
     branches: [main]
 
@@ -38,3 +38,9 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          # Safe fallbacks for CI builds (no secrets required)
+          VITE_SUPABASE_URL: "http://localhost"
+          VITE_SUPABASE_ANON_KEY: "dummy"
+          VITE_SENTRY_DSN: ""
+          VITE_MAPBOX_TOKEN: "dummy"

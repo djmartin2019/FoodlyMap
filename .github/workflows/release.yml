@@ -33,13 +33,22 @@ jobs:
       - name: Build project
         run: npm run build
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
-          VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || '' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || '' }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN || '' }}
+          VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN || '' }}
+
+      - name: Check Sentry secrets
+        id: check-secrets
+        run: |
+          if [ -n "${{ secrets.SENTRY_AUTH_TOKEN }}" ] && [ -n "${{ secrets.SENTRY_ORG }}" ] && [ -n "${{ secrets.SENTRY_PROJECT }}" ]; then
+            echo "secrets_configured=true" >> $GITHUB_OUTPUT
+          else
+            echo "secrets_configured=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Create Sentry release and upload sourcemaps
-        if: secrets.SENTRY_AUTH_TOKEN != '' && secrets.SENTRY_ORG != '' && secrets.SENTRY_PROJECT != ''
+        if: steps.check-secrets.outputs.secrets_configured == 'true'
         uses: getsentry/action-release@v1
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
@@ -53,7 +62,7 @@ jobs:
           finalize: true
 
       - name: Skip Sentry release (secrets not configured)
-        if: secrets.SENTRY_AUTH_TOKEN == '' || secrets.SENTRY_ORG == '' || secrets.SENTRY_PROJECT == ''
+        if: steps.check-secrets.outputs.secrets_configured == 'false'
         run: |
           echo "⚠️ Sentry secrets not configured. Skipping Sentry release."
           echo "To enable Sentry releases, configure SENTRY_AUTH_TOKEN, SENTRY_ORG, and SENTRY_PROJECT secrets."
