@@ -49,6 +49,8 @@ export default function ListDetailPage() {
   const [isOwner, setIsOwner] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [inFeed, setInFeed] = useState(false);
+  const [feedLoading, setFeedLoading] = useState(false);
 
   // Load list
   useEffect(() => {
@@ -76,6 +78,16 @@ export default function ListDetailPage() {
 
         setList(data);
         setIsOwner(data.owner_id === user.id);
+
+        // Check if list is in feed (only for owners of public lists)
+        if (data.owner_id === user.id && data.visibility === "public") {
+          const { data: feedData } = await supabase
+            .from("feed_posts")
+            .select("id")
+            .eq("list_id", data.id)
+            .maybeSingle();
+          setInFeed(!!feedData);
+        }
 
         // Load list places
         const { data: placesData, error: placesError } = await supabase
@@ -201,6 +213,95 @@ export default function ListDetailPage() {
     }
   };
 
+  // Handle add to feed
+  const handleAddToFeed = async () => {
+    if (!list || !isOwner || list.visibility !== "public") return;
+
+    setFeedLoading(true);
+    setError(null);
+
+    try {
+      const { error: insertError } = await supabase
+        .from("feed_posts")
+        .insert([{ list_id: list.id }]);
+
+      if (insertError) {
+        if (import.meta.env.DEV) {
+          console.error("Error adding to feed:", insertError);
+        }
+        setError("Failed to add to feed. Please try again.");
+        setFeedLoading(false);
+        return;
+      }
+
+      setInFeed(true);
+      setFeedLoading(false);
+
+      // PostHog: Track feed add
+      try {
+        import("posthog-js").then(({ default: posthog }) => {
+          posthog.capture("list_added_to_feed", {
+            list_id: list.id,
+            slug: list.slug,
+          });
+        });
+      } catch (e) {
+        // Silently ignore PostHog errors
+      }
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error("Unexpected error adding to feed:", err);
+      }
+      setError("An unexpected error occurred");
+      setFeedLoading(false);
+    }
+  };
+
+  // Handle remove from feed
+  const handleRemoveFromFeed = async () => {
+    if (!list || !isOwner) return;
+
+    setFeedLoading(true);
+    setError(null);
+
+    try {
+      const { error: deleteError } = await supabase
+        .from("feed_posts")
+        .delete()
+        .eq("list_id", list.id);
+
+      if (deleteError) {
+        if (import.meta.env.DEV) {
+          console.error("Error removing from feed:", deleteError);
+        }
+        setError("Failed to remove from feed. Please try again.");
+        setFeedLoading(false);
+        return;
+      }
+
+      setInFeed(false);
+      setFeedLoading(false);
+
+      // PostHog: Track feed remove
+      try {
+        import("posthog-js").then(({ default: posthog }) => {
+          posthog.capture("list_removed_from_feed", {
+            list_id: list.id,
+            slug: list.slug,
+          });
+        });
+      } catch (e) {
+        // Silently ignore PostHog errors
+      }
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error("Unexpected error removing from feed:", err);
+      }
+      setError("An unexpected error occurred");
+      setFeedLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <RequireAuth>
@@ -303,13 +404,26 @@ export default function ListDetailPage() {
 
         {/* Owner actions */}
         {isOwner && (
-          <div className="mb-6">
+          <div className="mb-6 flex flex-wrap gap-3">
             <button
               onClick={() => setShowAddModal(true)}
               className="rounded-lg border border-accent/60 bg-accent/15 px-6 py-3 text-sm font-medium text-accent transition-colors hover:border-accent hover:bg-accent/20"
             >
               Edit Places
             </button>
+            {list.visibility === "public" && (
+              <button
+                onClick={inFeed ? handleRemoveFromFeed : handleAddToFeed}
+                disabled={feedLoading}
+                className="rounded-lg border border-accent/60 bg-accent/15 px-6 py-3 text-sm font-medium text-accent transition-colors hover:border-accent hover:bg-accent/20 disabled:opacity-50"
+              >
+                {feedLoading
+                  ? "Loading..."
+                  : inFeed
+                    ? "Remove from Feed"
+                    : "Add to Feed"}
+              </button>
+            )}
           </div>
         )}
 

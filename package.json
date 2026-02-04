@@ -13,9 +13,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build",
-    "ci": "npm run lint && npm run typecheck && npm run test && npm run build",
-    "prepare": "husky",
-    "lint-staged": "lint-staged"
+    "ci": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
     "@sentry/react": "^10.38.0",
@@ -47,9 +45,7 @@
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "eslint-plugin-unused-imports": "^4.3.0",
     "globals": "^17.3.0",
-    "husky": "^9.1.7",
     "jsdom": "^25.0.1",
-    "lint-staged": "^15.5.2",
     "postcss": "^8.4.49",
     "supabase": "^2.74.5",
     "tailwindcss": "^3.4.16",
