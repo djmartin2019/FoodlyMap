@@ -13,6 +13,7 @@ import { RequireAuth } from "./components/RequireAuth";
 import { useAuth } from "./contexts/AuthContext";
 import ContactPage from "./pages/ContactPage";
 import DashboardPage from "./pages/DashboardPage";
+import FeedPage from "./pages/FeedPage";
 import ListDetailPage from "./pages/ListDetailPage";
 import ListsPage from "./pages/ListsPage";
 import LoginPage from "./pages/LoginPage";
@@ -147,6 +148,17 @@ const listsRoute = createRoute({
   ),
 });
 
+// Protected feed route (requires authentication)
+const feedRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/feed",
+  component: () => (
+    <RequireAuth>
+      <FeedPage />
+    </RequireAuth>
+  ),
+});
+
 // Protected list detail route (requires authentication, owner-only management)
 const listDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -171,6 +183,7 @@ const routeTree = rootRoute.addChildren([
   userDashboardRoute,
   profileRoute,
   listsRoute,
+  feedRoute,
   listDetailRoute,
   publicListRoute,
 ]);
@@ -237,6 +250,12 @@ function RootLayout() {
                   className="text-sm text-text/70 transition-colors hover:text-accent"
                 >
                   Lists
+                </Link>
+                <Link
+                  to="/feed"
+                  className="text-sm text-text/70 transition-colors hover:text-accent"
+                >
+                  Feed
                 </Link>
                 <button
                   onClick={handleSignOut}

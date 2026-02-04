@@ -15,13 +15,18 @@ interface List {
   updated_at: string;
 }
 
+interface ListWithFeedStatus extends List {
+  inFeed?: boolean;
+}
+
 export default function ListsPage() {
   const { user } = useAuth();
-  const [lists, setLists] = useState<List[]>([]);
+  const [lists, setLists] = useState<ListWithFeedStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [feedLoading, setFeedLoading] = useState<Record<string, boolean>>({});
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -50,7 +55,31 @@ export default function ListsPage() {
           return;
         }
 
-        setLists(data || []);
+        const listsData = data || [];
+
+        // Check feed status for public lists
+        const publicListIds = listsData
+          .filter((list) => list.visibility === "public")
+          .map((list) => list.id);
+
+        if (publicListIds.length > 0) {
+          const { data: feedData } = await supabase
+            .from("feed_posts")
+            .select("list_id")
+            .in("list_id", publicListIds);
+
+          const feedListIds = new Set((feedData || []).map((fp) => fp.list_id));
+
+          const listsWithFeedStatus = listsData.map((list) => ({
+            ...list,
+            inFeed: list.visibility === "public" ? feedListIds.has(list.id) : false,
+          }));
+
+          setLists(listsWithFeedStatus);
+        } else {
+          setLists(listsData);
+        }
+
         setLoading(false);
       } catch (err) {
         if (import.meta.env.DEV) {
@@ -156,6 +185,99 @@ export default function ListsPage() {
         console.error("Unexpected error deleting list:", err);
       }
       setError("An unexpected error occurred");
+    }
+  };
+
+  // Handle add to feed
+  const handleAddToFeed = async (listId: string) => {
+    if (!user) return;
+
+    setFeedLoading({ ...feedLoading, [listId]: true });
+    setError(null);
+
+    try {
+      const { error: insertError } = await supabase
+        .from("feed_posts")
+        .insert([{ list_id: listId }]);
+
+      if (insertError) {
+        if (import.meta.env.DEV) {
+          console.error("Error adding to feed:", insertError);
+        }
+        setError("Failed to add to feed. Please try again.");
+        setFeedLoading({ ...feedLoading, [listId]: false });
+        return;
+      }
+
+      // Update list state
+      setLists(
+        lists.map((list) => (list.id === listId ? { ...list, inFeed: true } : list))
+      );
+      setFeedLoading({ ...feedLoading, [listId]: false });
+
+      // PostHog: Track feed add
+      try {
+        import("posthog-js").then(({ default: posthog }) => {
+          posthog.capture("list_added_to_feed", {
+            list_id: listId,
+          });
+        });
+      } catch (e) {
+        // Silently ignore PostHog errors
+      }
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error("Unexpected error adding to feed:", err);
+      }
+      setError("An unexpected error occurred");
+      setFeedLoading({ ...feedLoading, [listId]: false });
+    }
+  };
+
+  // Handle remove from feed
+  const handleRemoveFromFeed = async (listId: string) => {
+    if (!user) return;
+
+    setFeedLoading({ ...feedLoading, [listId]: true });
+    setError(null);
+
+    try {
+      const { error: deleteError } = await supabase
+        .from("feed_posts")
+        .delete()
+        .eq("list_id", listId);
+
+      if (deleteError) {
+        if (import.meta.env.DEV) {
+          console.error("Error removing from feed:", deleteError);
+        }
+        setError("Failed to remove from feed. Please try again.");
+        setFeedLoading({ ...feedLoading, [listId]: false });
+        return;
+      }
+
+      // Update list state
+      setLists(
+        lists.map((list) => (list.id === listId ? { ...list, inFeed: false } : list))
+      );
+      setFeedLoading({ ...feedLoading, [listId]: false });
+
+      // PostHog: Track feed remove
+      try {
+        import("posthog-js").then(({ default: posthog }) => {
+          posthog.capture("list_removed_from_feed", {
+            list_id: listId,
+          });
+        });
+      } catch (e) {
+        // Silently ignore PostHog errors
+      }
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error("Unexpected error removing from feed:", err);
+      }
+      setError("An unexpected error occurred");
+      setFeedLoading({ ...feedLoading, [listId]: false });
     }
   };
 
@@ -270,6 +392,7 @@ export default function ListsPage() {
                 <tr className="border-b border-surface/60">
                   <th className="px-4 py-3 text-left text-sm font-semibold text-text">Name</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-text">Visibility</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-text">Feed</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-text">Created</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-text">Actions</th>
                 </tr>
@@ -294,6 +417,21 @@ export default function ListsPage() {
                         {list.visibility === "public" ? "Public" : "Private"}
                       </span>
                     </td>
+                    <td className="px-4 py-3">
+                      {list.visibility === "public" ? (
+                        <span
+                          className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${
+                            list.inFeed
+                              ? "bg-accent/20 text-accent"
+                              : "bg-surface/60 text-text/60"
+                          }`}
+                        >
+                          {list.inFeed ? "In Feed" : "Not in Feed"}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-text/40">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-sm text-text/60">
                       {new Date(list.created_at).toLocaleDateString()}
                     </td>
@@ -307,35 +445,52 @@ export default function ListsPage() {
                           Manage
                         </Link>
                         {list.visibility === "public" && (
-                          <button
-                            onClick={async () => {
-                              const url = `${window.location.origin}/l/${list.slug}`;
-                              try {
-                                await navigator.clipboard.writeText(url);
-                                alert("Public link copied to clipboard!");
-                                
-                                // PostHog: Track share click
+                          <>
+                            <button
+                              onClick={async () => {
+                                const url = `${window.location.origin}/l/${list.slug}`;
                                 try {
-                                  import("posthog-js").then(({ default: posthog }) => {
-                                    posthog.capture("list_share_clicked", {
-                                      list_id: list.id,
-                                      slug: list.slug,
-                                      visibility: list.visibility,
+                                  await navigator.clipboard.writeText(url);
+                                  alert("Public link copied to clipboard!");
+                                  
+                                  // PostHog: Track share click
+                                  try {
+                                    import("posthog-js").then(({ default: posthog }) => {
+                                      posthog.capture("list_share_clicked", {
+                                        list_id: list.id,
+                                        slug: list.slug,
+                                        visibility: list.visibility,
+                                      });
                                     });
-                                  });
-                                } catch (e) {
-                                  // Silently ignore PostHog errors
+                                  } catch (e) {
+                                    // Silently ignore PostHog errors
+                                  }
+                                } catch (err) {
+                                  if (import.meta.env.DEV) {
+                                    console.error("Failed to copy link:", err);
+                                  }
                                 }
-                              } catch (err) {
-                                if (import.meta.env.DEV) {
-                                  console.error("Failed to copy link:", err);
-                                }
+                              }}
+                              className="rounded border border-accent/60 bg-accent/15 px-2 py-1 text-xs font-medium text-accent transition-colors hover:border-accent hover:bg-accent/20"
+                            >
+                              Copy Link
+                            </button>
+                            <button
+                              onClick={() =>
+                                list.inFeed
+                                  ? handleRemoveFromFeed(list.id)
+                                  : handleAddToFeed(list.id)
                               }
-                            }}
-                            className="rounded border border-accent/60 bg-accent/15 px-2 py-1 text-xs font-medium text-accent transition-colors hover:border-accent hover:bg-accent/20"
-                          >
-                            Copy Link
-                          </button>
+                              disabled={feedLoading[list.id]}
+                              className="rounded border border-accent/60 bg-accent/15 px-2 py-1 text-xs font-medium text-accent transition-colors hover:border-accent hover:bg-accent/20 disabled:opacity-50"
+                            >
+                              {feedLoading[list.id]
+                                ? "..."
+                                : list.inFeed
+                                  ? "Remove from Feed"
+                                  : "Add to Feed"}
+                            </button>
+                          </>
                         )}
                         <button
                           onClick={() => handleDeleteList(list.id)}
