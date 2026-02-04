@@ -27,10 +27,15 @@ module.exports = {
         "glow-pulse": "glowPulse 3s ease-in-out infinite",
         "float": "float 6s ease-in-out infinite",
         "lift": "lift 0.3s ease-out",
+        "slide-down": "slideDown 0.2s ease-out",
       },
       keyframes: {
         fadeIn: {
           "0%": { opacity: "0", transform: "translateY(8px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        slideDown: {
+          "0%": { opacity: "0", transform: "translateY(-10px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
         glowPulse: {
