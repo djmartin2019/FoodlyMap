@@ -17,6 +17,9 @@ interface FormErrors {
   general?: string;
 }
 
+// Input length limits for security
+const MAX_NAME_LENGTH = 50;
+
 export default function SetPasswordPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -104,8 +107,16 @@ export default function SetPasswordPage() {
     }
 
     // First name validation
-    if (!firstName.trim()) {
+    const trimmedFirstName = firstName.trim();
+    if (!trimmedFirstName) {
       newErrors.firstName = "First name is required";
+    } else if (trimmedFirstName.length > MAX_NAME_LENGTH) {
+      newErrors.firstName = `First name must be ${MAX_NAME_LENGTH} characters or less`;
+    }
+
+    // Last name validation (optional but if provided, check length)
+    if (lastName.trim().length > MAX_NAME_LENGTH) {
+      newErrors.lastName = `Last name must be ${MAX_NAME_LENGTH} characters or less`;
     }
 
     // Phone validation (optional but if provided, should be valid format)
@@ -181,18 +192,23 @@ export default function SetPasswordPage() {
         id: currentUser.id,
         email: currentUser.email, // Required field
         username: username.toLowerCase().trim(),
-        first_name: firstName.trim(),
-        last_name: lastName.trim() || null,
+        first_name: firstName.trim().slice(0, MAX_NAME_LENGTH),
+        last_name: lastName.trim() ? lastName.trim().slice(0, MAX_NAME_LENGTH) : null,
         phone: phone.trim() || null,
         onboarding_complete: true, // Mark onboarding as complete
         created_at: new Date().toISOString(),
       };
 
-      log.log("Creating profile:", profileData);
+      // Log only non-sensitive fields for debugging (email, phone, and id are redacted by log utility)
+      if (import.meta.env.DEV) {
+        log.log("Creating profile (non-sensitive fields only):", {
+          username: profileData.username,
+          onboarding_complete: profileData.onboarding_complete,
+        });
+      }
 
       // Session should be valid (we're in RequireAuth wrapper)
       // No need to verify again - auth context already ensures session exists
-      log.log("Proceeding with profile creation...");
 
       // Step 2: Create profile
       log.log("Creating profile...");
@@ -482,6 +498,7 @@ export default function SetPasswordPage() {
               required
               autoComplete="given-name"
               disabled={loading}
+              maxLength={MAX_NAME_LENGTH}
               className="w-full rounded-lg border border-surface/60 bg-bg/40 px-4 py-3 text-text placeholder:text-text/40 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
               placeholder="John"
             />
@@ -502,6 +519,7 @@ export default function SetPasswordPage() {
               onChange={(e) => setLastName(e.target.value)}
               autoComplete="family-name"
               disabled={loading}
+              maxLength={MAX_NAME_LENGTH}
               className="w-full rounded-lg border border-surface/60 bg-bg/40 px-4 py-3 text-text placeholder:text-text/40 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
               placeholder="Doe"
             />

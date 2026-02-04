@@ -18,7 +18,7 @@ if (sentryDsn) {
     dsn: sentryDsn,
     // Setting this option to true will send default PII data to Sentry.
     // For example, automatic IP address collection on events
-    sendDefaultPii: true,
+    sendDefaultPii: false,
     // Environment (development, staging, production)
     environment: import.meta.env.MODE,
     // Release tracking (useful for tracking which version has errors)

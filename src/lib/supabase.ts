@@ -22,7 +22,21 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // This client handles authentication and can be extended for database operations
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    // Persist session in localStorage for closed beta
+    // SECURITY NOTE: Sessions are stored in localStorage by default in Supabase client-side apps.
+    // This is a known trade-off: localStorage is accessible to JavaScript, making it vulnerable
+    // to XSS attacks if malicious scripts are injected. However, this is the standard approach
+    // for client-side Supabase applications.
+    //
+    // Mitigations in place:
+    // - CSP headers prevent unauthorized script execution
+    // - Supabase tokens are short-lived and auto-refresh
+    // - RLS policies enforce authorization at the database level
+    //
+    // For enhanced security (httpOnly cookies), you would need:
+    // - A backend proxy/server to handle auth
+    // - Custom session management
+    // - This is typically only needed for high-security applications
+    //
     // Sessions will survive page refreshes
     persistSession: true,
     autoRefreshToken: true,
