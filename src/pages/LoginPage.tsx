@@ -33,8 +33,13 @@ export default function LoginPage() {
   
     const { error } = await signInWithPassword(email, password);
     if (error) {
-      setError(error.message || "Invalid email or password");
-      setLoading(false);
+      // SECURITY: Always show generic error message with random delay
+      // to prevent timing attacks and email enumeration
+      const delay = 500 + Math.random() * 500; // Random delay 500-1000ms
+      setTimeout(() => {
+        setError("Invalid email or password");
+        setLoading(false);
+      }, delay);
       return;
     }
     // success → AuthContext updates `user`
