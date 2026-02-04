@@ -67,8 +67,18 @@ export default function FeedPage() {
         const ownerIds = [
           ...new Set(
             feedData
-              .map((post) => (post.lists as { owner_id: string }).owner_id)
-              .filter(Boolean)
+              .map((post) => {
+                // Supabase returns lists as an object (not array) with !inner
+                const lists = post.lists as unknown as {
+                  id: string;
+                  name: string;
+                  slug: string;
+                  visibility: string;
+                  owner_id: string;
+                };
+                return lists?.owner_id;
+              })
+              .filter((id): id is string => Boolean(id))
           ),
         ];
 
@@ -97,13 +107,27 @@ export default function FeedPage() {
 
         // Step 5: Combine feed posts with usernames
         const feedPostsWithUsernames: FeedPost[] = feedData.map((post) => {
-          const list = post.lists as {
+          // Supabase returns lists as an object (not array) with !inner
+          const listsData = post.lists as unknown as {
             id: string;
             name: string;
             slug: string;
             visibility: string;
             owner_id: string;
           };
+          
+          if (!listsData) {
+            throw new Error("Missing lists data in feed post");
+          }
+          
+          const list = {
+            id: String(listsData.id),
+            name: String(listsData.name),
+            slug: String(listsData.slug),
+            visibility: String(listsData.visibility),
+            owner_id: String(listsData.owner_id),
+          };
+          
           return {
             id: post.id,
             added_at: post.added_at,
