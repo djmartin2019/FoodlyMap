@@ -6,6 +6,7 @@ import {
   Outlet,
   useNavigate
 } from "@tanstack/react-router";
+import React from "react";
 
 import AuthCallbackPage from "./auth/callbacks/AuthCallbackPage";
 import { PostHogPageview } from "./components/PostHogPageview";
@@ -202,6 +203,7 @@ function RootLayout() {
   // Use auth context to show/hide navigation items
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
   const handleSignOut = async () => {
     // signOut now handles all errors internally and never throws
@@ -215,21 +217,48 @@ function RootLayout() {
       search: {},
       replace: true 
     });
+    setMobileMenuOpen(false);
   };
+
+  // Close mobile menu when clicking outside or on a link
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (mobileMenuOpen && !target.closest('nav')) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    if (mobileMenuOpen) {
+      document.addEventListener('click', handleClickOutside);
+      // Prevent body scroll when menu is open
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
 
   return (
     <div className="min-h-screen bg-bg text-text flex flex-col" style={{ minHeight: '100dvh' }}>
       <PostHogPageview />
-      <nav className="sticky top-0 z-10 border-b border-surface bg-bg/90 backdrop-blur" aria-label="Main navigation" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+      <nav className="sticky top-0 z-50 border-b border-surface bg-bg/90 backdrop-blur" aria-label="Main navigation" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
           <Link
             to={user ? "/dashboard" : "/"}
             className="text-lg font-semibold tracking-wide text-text transition-colors hover:text-accent"
             aria-label={user ? "Foodly Map dashboard" : "Foodly Map home"}
+            onClick={() => setMobileMenuOpen(false)}
           >
             Foodly Map
           </Link>
-          <div className="flex items-center gap-4">
+          
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center gap-4">
             {user ? (
               <>
                 <Link
@@ -274,8 +303,108 @@ function RootLayout() {
               </Link>
             )}
           </div>
+
+          {/* Mobile Hamburger Button */}
+          {user && (
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden flex flex-col gap-1.5 p-2 text-text/70 hover:text-accent transition-colors"
+              aria-label="Toggle menu"
+              aria-expanded={mobileMenuOpen}
+            >
+              <span
+                className={`block h-0.5 w-6 bg-current transition-all duration-300 ${
+                  mobileMenuOpen ? 'rotate-45 translate-y-2' : ''
+                }`}
+              />
+              <span
+                className={`block h-0.5 w-6 bg-current transition-all duration-300 ${
+                  mobileMenuOpen ? 'opacity-0' : ''
+                }`}
+              />
+              <span
+                className={`block h-0.5 w-6 bg-current transition-all duration-300 ${
+                  mobileMenuOpen ? '-rotate-45 -translate-y-2' : ''
+                }`}
+              />
+            </button>
+          )}
+
+          {/* Mobile Sign In Link (when not authenticated) */}
+          {!user && (
+            <Link
+              to="/login"
+              search={{}}
+              className="md:hidden text-sm text-text/70 transition-colors hover:text-accent"
+            >
+              Sign In
+            </Link>
+          )}
         </div>
       </nav>
+
+      {/* Mobile Menu Dropdown - Outside nav for proper positioning */}
+      {mobileMenuOpen && user && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-bg/80 backdrop-blur-sm z-40 md:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-hidden="true"
+            style={{ 
+              top: 'max(calc(1rem + 4rem), calc(env(safe-area-inset-top) + 4rem))'
+            }}
+          />
+          
+          {/* Mobile Menu Dropdown */}
+          <div 
+            className="fixed left-0 right-0 z-50 md:hidden bg-surface border-b border-surface/60 shadow-neon-lg animate-slide-down"
+            style={{ 
+              top: 'max(calc(1rem + 4rem), calc(env(safe-area-inset-top) + 4rem))',
+              paddingTop: '0.5rem',
+              paddingBottom: '0.5rem'
+            }}
+          >
+            <div className="flex flex-col">
+              <Link
+                to="/dashboard"
+                search={{}}
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-6 py-3 text-base font-medium text-text transition-colors hover:text-accent hover:bg-surface/50 border-b border-surface/60"
+              >
+                Dashboard
+              </Link>
+              <Link
+                to="/profile"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-6 py-3 text-base font-medium text-text transition-colors hover:text-accent hover:bg-surface/50 border-b border-surface/60"
+              >
+                Profile
+              </Link>
+              <Link
+                to="/lists"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-6 py-3 text-base font-medium text-text transition-colors hover:text-accent hover:bg-surface/50 border-b border-surface/60"
+              >
+                Lists
+              </Link>
+              <Link
+                to="/feed"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-6 py-3 text-base font-medium text-text transition-colors hover:text-accent hover:bg-surface/50 border-b border-surface/60"
+              >
+                Feed
+              </Link>
+              <button
+                onClick={handleSignOut}
+                className="px-6 py-3 text-base font-medium text-text transition-colors hover:text-accent hover:bg-surface/50 text-left"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </>
+      )}
       <main className="flex-1">
         <Outlet />
       </main>
