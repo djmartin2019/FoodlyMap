@@ -432,7 +432,7 @@ export default function ListsPage() {
                     <td className="px-4 py-3">
                       <div className="font-medium text-text">{list.name}</div>
                       {list.description && (
-                        <div className="mt-1 text-sm text-text/60">{list.description}</div>
+                        <div className="mt-1 hidden text-sm text-text/60 md:block">{list.description}</div>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -449,7 +449,7 @@ export default function ListsPage() {
                     <td className="px-4 py-3">
                       {list.visibility === "public" ? (
                         <span
-                          className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${
+                          className={`inline-block whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${
                             list.inFeed
                               ? "bg-accent/20 text-accent"
                               : "bg-surface/60 text-text/60"

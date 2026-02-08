@@ -13,6 +13,7 @@ export interface Place {
   longitude: number;
   display_address?: string | null;
   category_name?: string | null;
+  verified?: boolean;
 }
 
 interface UserLocation {
@@ -302,6 +303,7 @@ export default function DashboardMap({
             name: place.name,
             display_address: place.display_address,
             category_name: place.category_name,
+            verified: place.verified,
           },
           onAddToList ? () => onAddToList(place) : undefined
         );

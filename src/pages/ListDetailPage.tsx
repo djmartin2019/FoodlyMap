@@ -16,6 +16,7 @@ interface Place {
   region: string | null;
   postal_code: string | null;
   country: string | null;
+  verified: boolean;
 }
 
 interface ListPlace {
@@ -93,7 +94,7 @@ export default function ListDetailPage() {
         const { data: placesData, error: placesError } = await supabase
           .from("list_places")
           .select(
-            "id, place_id, note, sort_order, added_at, places(id, name, display_address, address_line1, city, region, postal_code, country)"
+            "id, place_id, note, sort_order, added_at, places(id, name, display_address, address_line1, city, region, postal_code, country, verified)"
           )
           .eq("list_id", listId)
           .order("sort_order", { ascending: true, nullsFirst: false })
@@ -155,6 +156,7 @@ export default function ListDetailPage() {
           note: lp.note,
           added_at: lp.added_at,
           sort_order: lp.sort_order,
+          verified: place.verified || false,
         };
       });
   }, [listPlaces]);
@@ -202,7 +204,7 @@ export default function ListDetailPage() {
     const { data, error: placesError } = await supabase
       .from("list_places")
       .select(
-        "id, place_id, note, sort_order, added_at, places(id, name, display_address, address_line1, city, region, postal_code, country)"
+        "id, place_id, note, sort_order, added_at, places(id, name, display_address, address_line1, city, region, postal_code, country, verified)"
       )
       .eq("list_id", listId)
       .order("sort_order", { ascending: true, nullsFirst: false })
