@@ -19,6 +19,7 @@ export function buildPlacePopupNode(
     name: string;
     display_address?: string | null;
     category_name?: string | null;
+    verified?: boolean;
   },
   onAddToList?: () => void
 ): HTMLElement {
@@ -28,13 +29,61 @@ export function buildPlacePopupNode(
   container.style.flexDirection = "column";
   container.style.gap = "4px";
 
+  // Place name row with verification badge
+  const nameRow = document.createElement("div");
+  nameRow.style.display = "flex";
+  nameRow.style.alignItems = "center";
+  nameRow.style.justifyContent = "space-between";
+  nameRow.style.gap = "8px";
+
   // Place name
   const nameEl = document.createElement("div");
   nameEl.style.fontSize = "14px";
   nameEl.style.fontWeight = "600";
   nameEl.style.color = "#e9fff2";
+  nameEl.style.flex = "1";
   nameEl.textContent = place.name; // Safe: textContent escapes HTML
-  container.appendChild(nameEl);
+  nameRow.appendChild(nameEl);
+
+  // Verification badge (if verified)
+  if (place.verified) {
+    const verifiedBadge = document.createElement("div");
+    verifiedBadge.style.display = "inline-flex";
+    verifiedBadge.style.alignItems = "center";
+    verifiedBadge.style.gap = "4px";
+    verifiedBadge.style.padding = "2px 8px";
+    verifiedBadge.style.background = "rgba(57, 255, 136, 0.2)";
+    verifiedBadge.style.borderRadius = "9999px";
+    verifiedBadge.style.fontSize = "10px";
+    verifiedBadge.style.fontWeight = "500";
+    verifiedBadge.style.color = "#39FF88";
+    verifiedBadge.style.flexShrink = "0";
+
+    // Checkmark icon (SVG)
+    const checkmarkSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    checkmarkSvg.setAttribute("width", "12");
+    checkmarkSvg.setAttribute("height", "12");
+    checkmarkSvg.setAttribute("viewBox", "0 0 24 24");
+    checkmarkSvg.setAttribute("fill", "none");
+    checkmarkSvg.setAttribute("stroke", "currentColor");
+    checkmarkSvg.setAttribute("stroke-width", "2");
+    checkmarkSvg.setAttribute("stroke-linecap", "round");
+    checkmarkSvg.setAttribute("stroke-linejoin", "round");
+    checkmarkSvg.style.flexShrink = "0";
+
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z");
+    checkmarkSvg.appendChild(path);
+
+    verifiedBadge.appendChild(checkmarkSvg);
+
+    const verifiedText = document.createTextNode("Verified");
+    verifiedBadge.appendChild(verifiedText);
+
+    nameRow.appendChild(verifiedBadge);
+  }
+
+  container.appendChild(nameRow);
 
   // Display address (if available)
   if (place.display_address) {

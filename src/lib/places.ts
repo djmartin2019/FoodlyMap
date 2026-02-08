@@ -32,6 +32,7 @@ export interface ExistingPlace {
   longitude: number;
   display_address?: string | null;
   created_at?: string;
+  verified?: boolean;
 }
 
 /**
@@ -56,7 +57,7 @@ async function findPlaceByMapboxId(
 ): Promise<ExistingPlace | null> {
   const { data, error } = await supabase
     .from("places")
-    .select("id, name, latitude, longitude, display_address, created_at")
+    .select("id, name, latitude, longitude, display_address, created_at, verified")
     .eq("mapbox_place_id", mapboxPlaceId)
     .maybeSingle();
 
@@ -84,7 +85,7 @@ async function findPlaceByFallback(
 
   const { data, error } = await supabase
     .from("places")
-    .select("id, name, latitude, longitude, display_address, created_at")
+    .select("id, name, latitude, longitude, display_address, created_at, verified")
     .eq("name_norm", nameNorm)
     .eq("lat_round", latRound)
     .eq("lng_round", lngRound)
@@ -199,7 +200,7 @@ export async function createOrGetPlace(
   const { data: newPlace, error: insertError } = await supabase
     .from("places")
     .insert([placeDataToInsert])
-    .select("id, name, latitude, longitude, display_address, created_at")
+    .select("id, name, latitude, longitude, display_address, created_at, verified")
     .single();
 
   if (insertError) {
