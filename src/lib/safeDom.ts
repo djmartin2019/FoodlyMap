@@ -45,19 +45,21 @@ export function buildPlacePopupNode(
   nameEl.textContent = place.name; // Safe: textContent escapes HTML
   nameRow.appendChild(nameEl);
 
-  // Verification badge (if verified)
+  // Verification badge (always show - verified or unverified)
+  const verificationBadge = document.createElement("div");
+  verificationBadge.style.display = "inline-flex";
+  verificationBadge.style.alignItems = "center";
+  verificationBadge.style.gap = "4px";
+  verificationBadge.style.padding = "2px 8px";
+  verificationBadge.style.borderRadius = "9999px";
+  verificationBadge.style.fontSize = "10px";
+  verificationBadge.style.fontWeight = "500";
+  verificationBadge.style.flexShrink = "0";
+
   if (place.verified) {
-    const verifiedBadge = document.createElement("div");
-    verifiedBadge.style.display = "inline-flex";
-    verifiedBadge.style.alignItems = "center";
-    verifiedBadge.style.gap = "4px";
-    verifiedBadge.style.padding = "2px 8px";
-    verifiedBadge.style.background = "rgba(57, 255, 136, 0.2)";
-    verifiedBadge.style.borderRadius = "9999px";
-    verifiedBadge.style.fontSize = "10px";
-    verifiedBadge.style.fontWeight = "500";
-    verifiedBadge.style.color = "#39FF88";
-    verifiedBadge.style.flexShrink = "0";
+    // Verified badge (green)
+    verificationBadge.style.background = "rgba(57, 255, 136, 0.2)";
+    verificationBadge.style.color = "#39FF88";
 
     // Checkmark icon (SVG)
     const checkmarkSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -75,13 +77,19 @@ export function buildPlacePopupNode(
     path.setAttribute("d", "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z");
     checkmarkSvg.appendChild(path);
 
-    verifiedBadge.appendChild(checkmarkSvg);
-
+    verificationBadge.appendChild(checkmarkSvg);
     const verifiedText = document.createTextNode("Verified");
-    verifiedBadge.appendChild(verifiedText);
+    verificationBadge.appendChild(verifiedText);
+  } else {
+    // Unverified badge (yellow)
+    verificationBadge.style.background = "rgba(234, 179, 8, 0.2)";
+    verificationBadge.style.color = "#EAB308";
 
-    nameRow.appendChild(verifiedBadge);
+    const unverifiedText = document.createTextNode("Unverified");
+    verificationBadge.appendChild(unverifiedText);
   }
+
+  nameRow.appendChild(verificationBadge);
 
   container.appendChild(nameRow);
 
