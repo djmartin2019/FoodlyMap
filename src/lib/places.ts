@@ -3,8 +3,9 @@
  * 
  * Handles finding existing places and creating new ones with proper deduplication:
  * 1. First checks by mapbox_place_id (if present)
- * 2. Falls back to (name_norm, lat_round, lng_round) matching
- * 3. Never inserts generated columns (name_norm, lat_round, lng_round)
+ * 2. Falls back to exact match on (name_norm, lat_round, lng_round)
+ * 3. If no exact match, uses fuzzy matching: finds places within 50m with >80% name similarity
+ * 4. Never inserts generated columns (name_norm, lat_round, lng_round)
  */
 
 import { log } from "./log";
@@ -47,6 +48,82 @@ function normalizeName(name: string): string {
  */
 function roundCoordinate(coord: number): number {
   return Number(coord.toFixed(5));
+}
+
+/**
+ * Calculate string similarity using Levenshtein distance
+ * Returns a value between 0 (completely different) and 1 (identical)
+ */
+function calculateNameSimilarity(name1: string, name2: string): number {
+  const normalized1 = normalizeName(name1);
+  const normalized2 = normalizeName(name2);
+  
+  // Exact match
+  if (normalized1 === normalized2) return 1.0;
+  
+  // Check if one contains the other (e.g., "Starbucks" contains "Starbucks Coffee")
+  if (normalized1.includes(normalized2) || normalized2.includes(normalized1)) {
+    return 0.9;
+  }
+  
+  // Simple Levenshtein distance calculation
+  const maxLen = Math.max(normalized1.length, normalized2.length);
+  if (maxLen === 0) return 1.0;
+  
+  const distance = levenshteinDistance(normalized1, normalized2);
+  return 1 - (distance / maxLen);
+}
+
+/**
+ * Simple Levenshtein distance implementation
+ */
+function levenshteinDistance(str1: string, str2: string): number {
+  const matrix: number[][] = [];
+  
+  for (let i = 0; i <= str2.length; i++) {
+    matrix[i] = [i];
+  }
+  
+  for (let j = 0; j <= str1.length; j++) {
+    matrix[0][j] = j;
+  }
+  
+  for (let i = 1; i <= str2.length; i++) {
+    for (let j = 1; j <= str1.length; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  
+  return matrix[str2.length][str1.length];
+}
+
+/**
+ * Calculate distance between two coordinates in meters (Haversine formula)
+ */
+function calculateDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371000; // Earth radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) *
+      Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
 /**
@@ -102,6 +179,74 @@ async function findPlaceByFallback(
 }
 
 /**
+ * Find existing place with fuzzy matching
+ * 
+ * Strategy:
+ * 1. Try exact match (mapbox_place_id or name + coordinates)
+ * 2. If no exact match, find places within 50m with similar names (>80% similarity)
+ * 3. Return the best match if found
+ */
+async function findPlaceByFuzzyMatch(
+  name: string,
+  latitude: number,
+  longitude: number
+): Promise<ExistingPlace | null> {
+  // Search within 50 meters (0.00045 degrees ≈ 50m at equator)
+  const searchRadius = 0.00045;
+  const minLat = latitude - searchRadius;
+  const maxLat = latitude + searchRadius;
+  const minLng = longitude - searchRadius;
+  const maxLng = longitude + searchRadius;
+  
+  const { data: nearbyPlaces, error } = await supabase
+    .from("places")
+    .select("id, name, latitude, longitude, display_address, created_at, verified")
+    .gte("latitude", minLat)
+    .lte("latitude", maxLat)
+    .gte("longitude", minLng)
+    .lte("longitude", maxLng);
+  
+  if (error || !nearbyPlaces) {
+    if (import.meta.env.DEV && error) {
+      log.error("Error finding nearby places for fuzzy match:", error);
+    }
+    return null;
+  }
+  
+  // Find the best match based on name similarity and distance
+  let bestMatch: { place: ExistingPlace; score: number } | null = null;
+  const nameSimilarityThreshold = 0.8; // 80% similarity required
+  const maxDistanceMeters = 50; // Within 50 meters
+  
+  for (const place of nearbyPlaces) {
+    const distance = calculateDistance(
+      latitude,
+      longitude,
+      place.latitude,
+      place.longitude
+    );
+    
+    // Skip if too far
+    if (distance > maxDistanceMeters) continue;
+    
+    const similarity = calculateNameSimilarity(name, place.name);
+    
+    // Skip if names aren't similar enough
+    if (similarity < nameSimilarityThreshold) continue;
+    
+    // Calculate combined score (favor closer places and more similar names)
+    const distanceScore = 1 - (distance / maxDistanceMeters); // 0 to 1
+    const combinedScore = (similarity * 0.7) + (distanceScore * 0.3);
+    
+    if (!bestMatch || combinedScore > bestMatch.score) {
+      bestMatch = { place, score: combinedScore };
+    }
+  }
+  
+  return bestMatch?.place || null;
+}
+
+/**
  * Find existing place using deduplication logic
  * 
  * Note: mapbox_place_id is only provided when it's safe to use for deduplication
@@ -123,7 +268,7 @@ export async function findExistingPlace({
   latitude: number;
   longitude: number;
   mapboxPlaceId?: string | null;
-}): Promise<{ place: ExistingPlace | null; method: "mapbox_place_id" | "fallback" | null }> {
+}): Promise<{ place: ExistingPlace | null; method: "mapbox_place_id" | "fallback" | "fuzzy" | null }> {
   // First, try mapbox_place_id if available
   // Note: mapbox_place_id is only set when it's safe to use (address feature or <= 75m)
   if (mapboxPlaceId) {
@@ -133,10 +278,16 @@ export async function findExistingPlace({
     }
   }
 
-  // Fallback to name + rounded coordinates
+  // Second, try exact match (name + rounded coordinates)
   const place = await findPlaceByFallback(name, latitude, longitude);
   if (place) {
     return { place, method: "fallback" };
+  }
+
+  // Third, try fuzzy matching (similar name + nearby coordinates)
+  const fuzzyPlace = await findPlaceByFuzzyMatch(name, latitude, longitude);
+  if (fuzzyPlace) {
+    return { place: fuzzyPlace, method: "fuzzy" };
   }
 
   return { place: null, method: null };
