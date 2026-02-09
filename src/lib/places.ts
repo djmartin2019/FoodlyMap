@@ -189,8 +189,7 @@ async function findPlaceByFallback(
 async function findPlaceByFuzzyMatch(
   name: string,
   latitude: number,
-  longitude: number,
-  mapboxPlaceId?: string | null
+  longitude: number
 ): Promise<ExistingPlace | null> {
   // Search within 50 meters (0.00045 degrees ≈ 50m at equator)
   const searchRadius = 0.00045;
@@ -286,7 +285,7 @@ export async function findExistingPlace({
   }
 
   // Third, try fuzzy matching (similar name + nearby coordinates)
-  const fuzzyPlace = await findPlaceByFuzzyMatch(name, latitude, longitude, mapboxPlaceId);
+  const fuzzyPlace = await findPlaceByFuzzyMatch(name, latitude, longitude);
   if (fuzzyPlace) {
     return { place: fuzzyPlace, method: "fuzzy" };
   }
