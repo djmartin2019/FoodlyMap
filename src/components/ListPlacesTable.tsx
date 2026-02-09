@@ -17,6 +17,7 @@ export interface ListPlaceRow {
   note: string | null;
   added_at: string;
   sort_order: number | null;
+  verified: boolean;
 }
 
 interface ListPlacesTableProps {
@@ -82,9 +83,43 @@ export default function ListPlacesTable({
             </button>
           );
         },
-        cell: (info) => (
-          <div className="font-medium text-text">{info.getValue() as string}</div>
-        ),
+        cell: (info) => {
+          const row = info.row.original;
+          return (
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-medium text-text">{info.getValue() as string}</span>
+              {row.verified ? (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-2 py-0.5 text-xs font-medium text-accent flex-shrink-0"
+                  title="Verified location"
+                >
+                  <svg
+                    className="h-3 w-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  Verified
+                </span>
+              ) : (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full bg-yellow-500/20 px-2 py-0.5 text-xs font-medium text-yellow-500 flex-shrink-0"
+                  title="Unverified location"
+                >
+                  Unverified
+                </span>
+              )}
+            </div>
+          );
+        },
       },
       {
         accessorKey: "address",
@@ -348,7 +383,36 @@ export default function ListPlacesTable({
               className="rounded-lg border border-surface/60 bg-bg/40 p-4 transition-colors hover:border-surface/80"
             >
               <div className="mb-2 flex items-start justify-between gap-2">
-                <h3 className="font-semibold text-text">{place.name}</h3>
+                <h3 className="font-semibold text-text flex-1">{place.name}</h3>
+                {place.verified ? (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-2 py-0.5 text-xs font-medium text-accent flex-shrink-0"
+                    title="Verified location"
+                  >
+                    <svg
+                      className="h-3 w-3"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Verified
+                  </span>
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-yellow-500/20 px-2 py-0.5 text-xs font-medium text-yellow-500 flex-shrink-0"
+                    title="Unverified location"
+                  >
+                    Unverified
+                  </span>
+                )}
                 {isOwner && onRemove && (
                   <button
                     onClick={() => onRemove(place.list_place_id)}

@@ -17,6 +17,7 @@ interface Place {
   postal_code: string | null;
   country: string | null;
   mapbox_place_id: string | null;
+  verified: boolean;
 }
 
 interface ListPlace {
@@ -95,7 +96,7 @@ export default function PublicListPage() {
         const { data: placesData, error: placesError } = await supabase
           .from("list_places")
           .select(
-            "place_id, note, sort_order, added_at, places(id, name, latitude, longitude, display_address, address_line1, city, region, postal_code, country, mapbox_place_id)"
+            "place_id, note, sort_order, added_at, places(id, name, latitude, longitude, display_address, address_line1, city, region, postal_code, country, mapbox_place_id, verified)"
           )
           .eq("list_id", data.id)
           .order("sort_order", { ascending: true, nullsFirst: false })
@@ -165,6 +166,7 @@ export default function PublicListPage() {
             note: lp.note,
             added_at: lp.added_at,
             sort_order: lp.sort_order,
+            verified: place.verified || false,
           };
         });
     } catch (error) {

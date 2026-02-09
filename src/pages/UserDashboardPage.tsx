@@ -144,7 +144,8 @@ export default function UserDashboardPage() {
             latitude,
             longitude,
             created_at,
-            display_address
+            display_address,
+            verified
           ),
           category:categories (
             id,
@@ -231,6 +232,7 @@ export default function UserDashboardPage() {
               longitude: item.place.longitude,
               display_address: item.place.display_address || null,
               category_name: (item.category && typeof item.category === 'object' && !Array.isArray(item.category) && item.category.name) ? item.category.name : null,
+              verified: item.place.verified || false,
             });
           }
         });
@@ -476,6 +478,7 @@ export default function UserDashboardPage() {
         category_name: categoryId 
           ? categories.find(c => c.id === categoryId)?.name || null
           : null,
+        verified: placeData.verified || false,
       };
 
       const newLocation: Location = {
