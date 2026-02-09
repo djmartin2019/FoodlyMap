@@ -28,13 +28,12 @@ interface ListPlacesTableProps {
   removingId?: string | null;
 }
 
-// Custom global filter function that searches name, address, and note
+// Custom global filter function that searches name and address
 const globalFilterFn = (row: any, _columnId: string, filterValue: string) => {
   const search = filterValue.toLowerCase();
   const name = (row.original.name || "").toLowerCase();
   const address = (row.original.address || "").toLowerCase();
-  const note = (row.original.note || "").toLowerCase();
-  return name.includes(search) || address.includes(search) || note.includes(search);
+  return name.includes(search) || address.includes(search);
 };
 
 export default function ListPlacesTable({
@@ -143,27 +142,6 @@ export default function ListPlacesTable({
         ),
       },
       {
-        accessorKey: "note",
-        header: ({ column }) => {
-          return (
-            <button
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              className="flex items-center gap-1.5 hover:text-accent transition-colors"
-            >
-              Note
-              {column.getIsSorted() && (
-                <span className="text-accent/60 text-xs">
-                  {column.getIsSorted() === "asc" ? "↑" : "↓"}
-                </span>
-              )}
-            </button>
-          );
-        },
-        cell: (info) => (
-          <div className="text-sm text-text/60">{info.getValue() as string || "—"}</div>
-        ),
-      },
-      {
         accessorKey: "added_at",
         header: ({ column }) => {
           return (
@@ -217,8 +195,7 @@ export default function ListPlacesTable({
     return rows.filter(
       (row) =>
         row.name.toLowerCase().includes(search) ||
-        row.address.toLowerCase().includes(search) ||
-        (row.note?.toLowerCase().includes(search) ?? false)
+        row.address.toLowerCase().includes(search)
     );
   }, [rows, globalFilter]);
 
@@ -315,13 +292,13 @@ export default function ListPlacesTable({
     <div className="rounded-xl border border-surface/60 bg-surface/30">
       {/* Search input */}
       <div className="border-b border-surface/60 p-4">
-        <input
-          type="text"
-          placeholder="Search places, addresses, or notes..."
-          value={globalFilter}
-          onChange={(e) => setGlobalFilter(e.target.value)}
-          className="w-full rounded-lg border border-surface/60 bg-bg/40 px-4 py-2 text-sm text-text placeholder:text-text/40 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
-        />
+          <input
+            type="text"
+            placeholder="Search places or addresses..."
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="w-full rounded-lg border border-surface/60 bg-bg/40 px-4 py-2 text-sm text-text placeholder:text-text/40 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
+          />
         {hasActiveFilters && (
           <div className="mt-2 flex items-center justify-between">
             <span className="text-xs text-text/60">
@@ -425,9 +402,6 @@ export default function ListPlacesTable({
               </div>
               {place.address && (
                 <p className="mb-1 text-sm text-text/70">{place.address}</p>
-              )}
-              {place.note && (
-                <p className="mb-1 text-sm text-text/60">Note: {place.note}</p>
               )}
               <p className="text-xs text-text/50">
                 Added {formatDate(place.added_at)}
