@@ -31,13 +31,16 @@ export default function EditLocationModal({
   loading = false,
   onCategoryCreated,
 }: EditLocationModalProps) {
-  const [name, setName] = useState(location.name);
+  // Use user_display_name if available, otherwise fallback to canonical name
+  const initialDisplayName = location.user_display_name ?? location.name;
+  const [name, setName] = useState(initialDisplayName);
   const [categoryId, setCategoryId] = useState<string | null>(location.category_id || null);
   const [error, setError] = useState<string | null>(null);
 
   // Update form when location changes
   useEffect(() => {
-    setName(location.name);
+    const displayName = location.user_display_name ?? location.name;
+    setName(displayName);
     setCategoryId(location.category_id || null);
     setError(null);
   }, [location]);

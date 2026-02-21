@@ -132,11 +132,13 @@ export default function UserDashboardPage() {
       // Fetch places linked to this user via user_places junction table
       // category_id is now on user_places, not places
       // Also fetch category name if category_id exists
+      // user_display_name is on user_places for custom display names
       const { data, error: fetchError } = await supabase
         .from("user_places")
         .select(`
           id,
           category_id,
+          user_display_name,
           created_at,
           place:places (
             id,
@@ -193,6 +195,7 @@ export default function UserDashboardPage() {
             locationMap.set(placeId, {
               id: item.place.id,
               name: item.place.name,
+              user_display_name: item.user_display_name || null,
               latitude: item.place.latitude,
               longitude: item.place.longitude,
               category_id: item.category_id || null,
@@ -228,6 +231,7 @@ export default function UserDashboardPage() {
             placeMap.set(placeId, {
               id: item.place.id,
               name: item.place.name,
+              user_display_name: item.user_display_name || null,
               latitude: item.place.latitude,
               longitude: item.place.longitude,
               display_address: item.place.display_address || null,
@@ -421,11 +425,19 @@ export default function UserDashboardPage() {
         const userPlaceData: {
           user_id: string;
           place_id: string;
+          user_display_name?: string | null;
           category_id?: string | null;
         } = {
           user_id: user.id,
           place_id: placeId,
         };
+        
+        // Store user-defined display name if provided
+        if (name && name.trim() !== "") {
+          userPlaceData.user_display_name = name.trim();
+        } else {
+          userPlaceData.user_display_name = null;
+        }
         
         // Only include category_id if it has a value
         if (categoryId && categoryId.trim() !== "") {
@@ -469,9 +481,11 @@ export default function UserDashboardPage() {
       // Success: Add new place to local state
       // Use the clicked coordinates for the pin display, not the existing place's coordinates
       // This ensures the pin appears where the user clicked, even if we reused an existing place
+      // Use user_display_name if provided, otherwise fallback to place.name
       const newPlace: Place = {
         id: placeData.id,
         name: placeData.name,
+        user_display_name: name.trim() || null,
         latitude: pendingCoordinates.lat,
         longitude: pendingCoordinates.lng,
         display_address: placeData.display_address || null,
@@ -484,6 +498,7 @@ export default function UserDashboardPage() {
       const newLocation: Location = {
         id: placeData.id,
         name: placeData.name,
+        user_display_name: name.trim() || null,
         latitude: pendingCoordinates.lat,
         longitude: pendingCoordinates.lng,
         category_id: categoryId && categoryId.trim() !== "" ? categoryId : null,
@@ -575,26 +590,21 @@ export default function UserDashboardPage() {
         throw new Error("You do not have permission to update this location");
       }
 
-      // Update the place name (places table)
-      const placeUpdateData = { name };
-      const { error: placeUpdateError } = await supabase
-        .from("places")
-        .update(placeUpdateData)
-        .eq("id", locationId);
-
-      if (placeUpdateError) {
-        if (import.meta.env.DEV) {
-          log.error("Error updating place name:", placeUpdateError);
-        }
-        throw new Error(placeUpdateError.message || "Failed to update place name");
-      }
-
-      // Update category_id on user_places (not places)
+      // IMPORTANT: Update ONLY user_places.user_display_name, NOT places.name
+      // This allows users to customize display names without affecting the canonical place name
+      // Normalize name: empty string becomes null (use canonical place name)
+      const userDisplayName = (name && name.trim() !== "") ? name.trim() : null;
+      
+      // Update category_id and user_display_name on user_places (not places)
       // Normalize categoryId: empty string or null becomes null
       const categoryIdToSet = (categoryId && categoryId.trim() !== "") ? categoryId.trim() : null;
       
-      // Build update data - always include category_id (even if null) to ensure it's set
-      const userPlaceUpdateData: { category_id: string | null } = {
+      // Build update data - always include both fields (even if null) to ensure they're set
+      const userPlaceUpdateData: { 
+        user_display_name: string | null;
+        category_id: string | null;
+      } = {
+        user_display_name: userDisplayName,
         category_id: categoryIdToSet,
       };
 
@@ -609,9 +619,9 @@ export default function UserDashboardPage() {
 
       if (userPlaceUpdateError) {
         if (import.meta.env.DEV) {
-          log.error("Error updating user_places category:", userPlaceUpdateError);
+          log.error("Error updating user_places:", userPlaceUpdateError);
         }
-        throw new Error(userPlaceUpdateError.message || "Failed to update category");
+        throw new Error(userPlaceUpdateError.message || "Failed to update location");
       }
 
       if (!updatedUserPlaces || updatedUserPlaces.length === 0) {
@@ -619,12 +629,13 @@ export default function UserDashboardPage() {
       }
 
       // Optimistically update local state
+      // Use user_display_name for display, but keep canonical name in the name field
       setLocations(prevLocations => 
         prevLocations.map(loc => 
           loc.id === locationId 
             ? { 
                 ...loc, 
-                name, 
+                user_display_name: userDisplayName,
                 category_id: categoryId,
                 category_name: categoryId 
                   ? categories.find(c => c.id === categoryId)?.name || null
@@ -637,7 +648,7 @@ export default function UserDashboardPage() {
       setPlaces(prevPlaces =>
         prevPlaces.map(place =>
           place.id === locationId
-            ? { ...place, name }
+            ? { ...place, user_display_name: userDisplayName }
             : place
         )
       );

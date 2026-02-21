@@ -18,6 +18,7 @@ import EditLocationModal from "./EditLocationModal";
 export interface Location {
   id: string;
   name: string;
+  user_display_name?: string | null;
   latitude: number;
   longitude: number;
   category_id?: string | null;
@@ -43,7 +44,9 @@ interface LocationsTableProps {
 // Custom global filter function that searches name and category
 const globalFilterFn = (row: any, _columnId: string, filterValue: string) => {
   const search = filterValue.toLowerCase();
-  const name = (row.original.name || "").toLowerCase();
+  const location = row.original;
+  const displayName = location.user_display_name ?? location.name;
+  const name = (displayName || "").toLowerCase();
   const categoryName = (row.original.category_name || "").toLowerCase();
   return name.includes(search) || categoryName.includes(search);
 };
@@ -145,10 +148,12 @@ function MobileLocationCard({
     });
   };
 
+  const displayName = location.user_display_name ?? location.name;
+  
   return (
     <div className="rounded-lg border border-surface/60 bg-bg/40 p-3">
       <div className="mb-2">
-        <h3 className="text-sm font-semibold text-text">{location.name}</h3>
+        <h3 className="text-sm font-semibold text-text">{displayName}</h3>
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
           {location.category_name ? (
             <span className="inline-flex items-center rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
@@ -303,9 +308,13 @@ export default function LocationsTable({
       {
         accessorKey: "name",
         header: "Name",
-        cell: (info) => (
-          <span className="text-sm text-text">{info.getValue() as string}</span>
-        ),
+        cell: (info) => {
+          const location = info.row.original;
+          const displayName = location.user_display_name ?? location.name;
+          return (
+            <span className="text-sm text-text">{displayName}</span>
+          );
+        },
       },
       {
         accessorKey: "category_name",
@@ -547,7 +556,7 @@ export default function LocationsTable({
       {/* Delete Confirmation Dialog */}
       {deletingLocation && onDelete && (
         <DeleteConfirmationDialog
-          locationName={deletingLocation.name}
+          locationName={deletingLocation.user_display_name ?? deletingLocation.name}
           onConfirm={handleConfirmDelete}
           onCancel={() => {
             setDeletingLocation(null);
@@ -571,7 +580,7 @@ export default function LocationsTable({
           onClose={() => setAddingToListLocation(null)}
           place={{
             id: addingToListLocation.id,
-            name: addingToListLocation.name,
+            name: addingToListLocation.user_display_name ?? addingToListLocation.name,
           }}
         />
       )}
