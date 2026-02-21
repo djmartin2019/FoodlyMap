@@ -5,7 +5,7 @@ import * as Sentry from "@sentry/react";
 import { RouterProvider } from "@tanstack/react-router";
 import { PostHogProvider } from "posthog-js/react";
 import React from "react";
-import ReactDOM from "react-dom/client";
+import ReactDOM, { Root } from "react-dom/client";
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -109,8 +109,15 @@ if (!rootElement) {
   throw new Error("Root element '#root' not found. Cannot mount React app.");
 }
 
-// Create root and render
-const root = ReactDOM.createRoot(rootElement);
+type GlobalRoot = typeof globalThis & {
+  __foodlyReactRoot?: Root;
+};
+
+const globalForRoot = globalThis as GlobalRoot;
+// Reuse the same root during HMR/runtime recoveries to avoid duplicate roots.
+const root = globalForRoot.__foodlyReactRoot ?? ReactDOM.createRoot(rootElement);
+globalForRoot.__foodlyReactRoot = root;
+
 root.render(
   <React.StrictMode>
     <MaybePostHogProvider>
