@@ -21,8 +21,8 @@ import LoginPage from "./pages/LoginPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import ProfilePage from "./pages/ProfilePage";
 import PublicListPage from "./pages/PublicListPage";
-import RequestAccessPage from "./pages/RequestAccessPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import SignUpPage from "./pages/SignUpPage";
 import SetPasswordPage from "./pages/SetPasswordPage";
 import TermsPage from "./pages/TermsPage";
 import UserDashboardPage from "./pages/UserDashboardPage";
@@ -67,11 +67,11 @@ const publicListRoute = createRoute({
   },
 });
 
-// Request access route (public, no authentication required)
-const requestAccessRoute = createRoute({
+// Sign up route (public)
+const signupRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/request-access",
-  component: RequestAccessPage,
+  path: "/signup",
+  component: SignUpPage,
 });
 
 // Auth callback route (handles invite links, password reset, etc.)
@@ -177,7 +177,7 @@ const routeTree = rootRoute.addChildren([
   termsRoute,
   privacyRoute,
   loginRoute,
-  requestAccessRoute,
+  signupRoute,
   authCallbackRoute,
   setPasswordRoute,
   resetPasswordRoute,
@@ -294,13 +294,22 @@ function RootLayout() {
                 </button>
               </>
             ) : (
-              <Link
-                to="/login"
-                search={{}}
-                className="text-sm text-text/70 transition-colors hover:text-accent"
-              >
-                Sign In
-              </Link>
+              <>
+                <Link
+                  to="/login"
+                  search={{}}
+                  className="text-sm text-text/70 transition-colors hover:text-accent"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  to="/signup"
+                  search={{}}
+                  className="text-sm text-text/70 transition-colors hover:text-accent"
+                >
+                  Sign Up
+                </Link>
+              </>
             )}
           </div>
 
@@ -332,13 +341,22 @@ function RootLayout() {
 
           {/* Mobile Sign In Link (when not authenticated) */}
           {!user && (
-            <Link
-              to="/login"
-              search={{}}
-              className="md:hidden text-sm text-text/70 transition-colors hover:text-accent"
-            >
-              Sign In
-            </Link>
+            <div className="md:hidden flex items-center gap-3">
+              <Link
+                to="/login"
+                search={{}}
+                className="text-sm text-text/70 transition-colors hover:text-accent"
+              >
+                Sign In
+              </Link>
+              <Link
+                to="/signup"
+                search={{}}
+                className="text-sm text-text/70 transition-colors hover:text-accent"
+              >
+                Sign Up
+              </Link>
+            </div>
           )}
         </div>
       </nav>

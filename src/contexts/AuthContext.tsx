@@ -15,7 +15,19 @@ type AuthState = {
   signOut: () => Promise<void>;
 };
 
-const AuthContext = createContext<AuthState | null>(null);
+// Keep a singleton context in dev so HMR/module re-evaluation doesn't create
+// multiple context instances (which can trigger false "outside provider" errors).
+type GlobalAuthContext = typeof globalThis & {
+  __foodlyAuthContext?: React.Context<AuthState | null>;
+};
+
+const globalForAuth = globalThis as GlobalAuthContext;
+const AuthContext =
+  globalForAuth.__foodlyAuthContext ?? createContext<AuthState | null>(null);
+
+if (import.meta.env.DEV) {
+  globalForAuth.__foodlyAuthContext = AuthContext;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [initialized, setInitialized] = useState(false);
@@ -56,9 +68,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             try {
               // PostHog will handle if not initialized (no-op)
               posthog.identify(session.user.id);
-              if (posthog.people) {
-                posthog.people.set({ beta: true });
-              }
             } catch (e) {
               // Silently ignore PostHog errors
             }
@@ -98,9 +107,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             // PostHog will handle if not initialized (no-op)
             posthog.identify(newSession.user.id);
-            if (posthog.people) {
-              posthog.people.set({ beta: true });
-            }
           } catch (e) {
             // Silently ignore PostHog errors
           }

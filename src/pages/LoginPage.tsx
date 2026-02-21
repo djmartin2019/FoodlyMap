@@ -188,7 +188,7 @@ export default function LoginPage() {
             Sign In
           </h1>
           <p className="text-sm text-text/70">
-            Closed beta access only. Contact admin for credentials.
+            Sign in to continue to your dashboard.
           </p>
         </div>
 
@@ -257,14 +257,14 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Join Beta Link */}
+        {/* Sign Up Link */}
         <div className="mt-6 text-center">
-          <p className="mb-2 text-sm text-text/60">Don't have access yet?</p>
+          <p className="mb-2 text-sm text-text/60">Don't have an account?</p>
           <Link
-            to="/request-access"
+            to="/signup"
             className="text-sm font-medium text-accent/80 transition-colors hover:text-accent"
           >
-            Request Beta Access
+            Create an account
           </Link>
         </div>
       </div>
