@@ -22,8 +22,8 @@ import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import ProfilePage from "./pages/ProfilePage";
 import PublicListPage from "./pages/PublicListPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
-import SignUpPage from "./pages/SignUpPage";
 import SetPasswordPage from "./pages/SetPasswordPage";
+import SignUpPage from "./pages/SignUpPage";
 import TermsPage from "./pages/TermsPage";
 import UserDashboardPage from "./pages/UserDashboardPage";
 
