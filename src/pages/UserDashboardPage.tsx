@@ -482,7 +482,6 @@ export default function UserDashboardPage() {
       // Use the clicked coordinates for the pin display, not the existing place's coordinates
       // This ensures the pin appears where the user clicked, even if we reused an existing place
       // Use user_display_name if provided, otherwise fallback to place.name
-      const displayName = name.trim() || placeData.name;
       const newPlace: Place = {
         id: placeData.id,
         name: placeData.name,
