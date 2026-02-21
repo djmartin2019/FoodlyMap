@@ -9,6 +9,7 @@ export type MapMode = "VIEW" | "ADD_PLACE";
 export interface Place {
   id: string;
   name: string;
+  user_display_name?: string | null;
   latitude: number;
   longitude: number;
   display_address?: string | null;
@@ -297,10 +298,12 @@ export default function DashboardMap({
 
         // Create popup with safe DOM construction (prevents XSS)
         // All user-provided text is set via textContent, not innerHTML
+        // Use user_display_name if available, fallback to place.name
+        const displayName = place.user_display_name ?? place.name;
         const popupContentNode = buildPlacePopupNode(
           {
             id: place.id,
-            name: place.name,
+            name: displayName,
             display_address: place.display_address,
             category_name: place.category_name,
             verified: place.verified,

@@ -53,9 +53,10 @@ export default function AddSavedPlaceToListModal({
         setError(null);
 
         // Load candidate places (user's saved places)
+        // Include user_display_name for custom display names
         const { data: placesData, error: placesError } = await supabase
           .from("user_places")
-          .select("place_id, places(id, name, display_address, address_line1, city, region)")
+          .select("place_id, user_display_name, places(id, name, display_address, address_line1, city, region)")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false });
 
@@ -70,6 +71,7 @@ export default function AddSavedPlaceToListModal({
 
         // Transform the data to extract places
         // Defensive filtering: ensure places exist and have required fields
+        // Include user_display_name for display
         const userPlaces: Place[] = (placesData || [])
           .filter((up: any) => {
             if (!up || !up.places) return false;
@@ -81,7 +83,14 @@ export default function AddSavedPlaceToListModal({
               typeof place.name === 'string'
             );
           })
-          .map((up: any) => up.places) as Place[];
+          .map((up: any) => {
+            const place = up.places;
+            // Use user_display_name if available, otherwise use canonical name
+            return {
+              ...place,
+              name: up.user_display_name ?? place.name,
+            };
+          }) as Place[];
 
         setPlaces(userPlaces);
         const candidatePlaceIds = new Set(userPlaces.map((p) => p.id));
