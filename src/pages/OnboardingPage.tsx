@@ -78,6 +78,7 @@ export default function OnboardingPage() {
       navigate({ to: "/login", replace: true });
       return;
     }
+    const currentUser = user;
 
     let mounted = true;
     async function bootstrapProfile() {
@@ -85,7 +86,7 @@ export default function OnboardingPage() {
         const { data, error } = await supabase
           .from("profiles")
           .select("username,first_name,last_name,phone,onboarding_complete")
-          .eq("id", user.id)
+          .eq("id", currentUser.id)
           .maybeSingle<ExistingProfile>();
 
         if (error && error.code !== "PGRST116") {
