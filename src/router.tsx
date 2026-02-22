@@ -11,6 +11,7 @@ import React from "react";
 import AuthCallbackPage from "./auth/callbacks/AuthCallbackPage";
 import { PostHogPageview } from "./components/PostHogPageview";
 import { RequireAuth } from "./components/RequireAuth";
+import { RequireOnboarding } from "./components/RequireOnboarding";
 import { useAuth } from "./contexts/AuthContext";
 import ContactPage from "./pages/ContactPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -18,6 +19,7 @@ import FeedPage from "./pages/FeedPage";
 import ListDetailPage from "./pages/ListDetailPage";
 import ListsPage from "./pages/ListsPage";
 import LoginPage from "./pages/LoginPage";
+import OnboardingPage from "./pages/OnboardingPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import ProfilePage from "./pages/ProfilePage";
 import PublicListPage from "./pages/PublicListPage";
@@ -93,6 +95,17 @@ const loginRoute = createRoute({
   // LoginPage component will handle redirects if user is already authenticated
 });
 
+// Onboarding route (requires authentication)
+const onboardingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/onboarding",
+  component: () => (
+    <RequireAuth>
+      <OnboardingPage />
+    </RequireAuth>
+  ),
+});
+
 // Set password route (requires authentication, for onboarding)
 const setPasswordRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -121,7 +134,9 @@ const userDashboardRoute = createRoute({
   path: "/dashboard",
   component: () => (
     <RequireAuth>
-      <UserDashboardPage />
+      <RequireOnboarding>
+        <UserDashboardPage />
+      </RequireOnboarding>
     </RequireAuth>
   ),
 });
@@ -133,7 +148,9 @@ const profileRoute = createRoute({
   path: "/profile",
   component: () => (
     <RequireAuth>
-      <ProfilePage />
+      <RequireOnboarding>
+        <ProfilePage />
+      </RequireOnboarding>
     </RequireAuth>
   ),
 });
@@ -144,7 +161,9 @@ const listsRoute = createRoute({
   path: "/lists",
   component: () => (
     <RequireAuth>
-      <ListsPage />
+      <RequireOnboarding>
+        <ListsPage />
+      </RequireOnboarding>
     </RequireAuth>
   ),
 });
@@ -155,7 +174,9 @@ const feedRoute = createRoute({
   path: "/feed",
   component: () => (
     <RequireAuth>
-      <FeedPage />
+      <RequireOnboarding>
+        <FeedPage />
+      </RequireOnboarding>
     </RequireAuth>
   ),
 });
@@ -166,7 +187,9 @@ const listDetailRoute = createRoute({
   path: "/lists/$listId",
   component: () => (
     <RequireAuth>
-      <ListDetailPage />
+      <RequireOnboarding>
+        <ListDetailPage />
+      </RequireOnboarding>
     </RequireAuth>
   ),
 });
@@ -178,6 +201,7 @@ const routeTree = rootRoute.addChildren([
   privacyRoute,
   loginRoute,
   signupRoute,
+  onboardingRoute,
   authCallbackRoute,
   setPasswordRoute,
   resetPasswordRoute,
