@@ -16,12 +16,12 @@
     "ci": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
-    "@sentry/react": "^10.38.0",
-    "@supabase/supabase-js": "^2.91.1",
-    "@tanstack/react-router": "^1.91.1",
+    "@sentry/react": "^10.39.0",
+    "@supabase/supabase-js": "^2.97.0",
+    "@tanstack/react-router": "^1.162.4",
     "@tanstack/react-table": "^8.21.3",
     "mapbox-gl": "^3.8.0",
-    "posthog-js": "^1.336.4",
+    "posthog-js": "^1.352.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
