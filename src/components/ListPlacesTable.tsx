@@ -14,6 +14,7 @@ export interface ListPlaceRow {
   place_id: string;
   name: string;
   address: string;
+  mapUrl?: string;
   note: string | null;
   added_at: string;
   sort_order: number | null;
@@ -137,9 +138,26 @@ export default function ListPlacesTable({
             </button>
           );
         },
-        cell: (info) => (
-          <div className="text-sm text-text/70">{info.getValue() as string || "Address not available"}</div>
-        ),
+        cell: (info) => {
+          const row = info.row.original;
+          const addressValue = (info.getValue() as string) || "Address not available";
+          const hasAddress = !!row.address && row.address !== "Address not available";
+
+          if (row.mapUrl && hasAddress) {
+            return (
+              <a
+                href={row.mapUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-accent/80 underline decoration-accent/40 underline-offset-2 transition-colors hover:text-accent"
+              >
+                {addressValue}
+              </a>
+            );
+          }
+
+          return <div className="text-sm text-text/70">{addressValue}</div>;
+        },
       },
       {
         accessorKey: "added_at",
@@ -401,7 +419,18 @@ export default function ListPlacesTable({
                 )}
               </div>
               {place.address && (
-                <p className="mb-1 text-sm text-text/70">{place.address}</p>
+                place.mapUrl && place.address !== "Address not available" ? (
+                  <a
+                    href={place.mapUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mb-1 inline-block text-sm text-accent/80 underline decoration-accent/40 underline-offset-2 transition-colors hover:text-accent"
+                  >
+                    {place.address}
+                  </a>
+                ) : (
+                  <p className="mb-1 text-sm text-text/70">{place.address}</p>
+                )
               )}
               <p className="text-xs text-text/50">
                 Added {formatDate(place.added_at)}

@@ -39,6 +39,17 @@ interface List {
   slug: string;
 }
 
+const buildGoogleMapsSearchUrl = (query: string) =>
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+
+const hasValidCoordinates = (latitude: number, longitude: number) =>
+  Number.isFinite(latitude) &&
+  Number.isFinite(longitude) &&
+  latitude >= -90 &&
+  latitude <= 90 &&
+  longitude >= -180 &&
+  longitude <= 180;
+
 export default function PublicListPage() {
   // Get slug from route params
   const params = useParams({ strict: false });
@@ -157,12 +168,20 @@ export default function PublicListPage() {
           const address = addressParts.length > 0 
             ? addressParts.join(", ") 
             : place.display_address || "Address not available";
+          const mapQuery = addressParts.length > 0
+            ? addressParts.join(", ")
+            : place.display_address ||
+              place.name ||
+              (hasValidCoordinates(place.latitude, place.longitude)
+                ? `${place.latitude},${place.longitude}`
+                : "Food spot");
 
           return {
             list_place_id: lp.place_id, // Use place_id as fallback since PublicListPage doesn't have list_places.id
             place_id: lp.place_id,
             name: place.name,
             address,
+            mapUrl: buildGoogleMapsSearchUrl(mapQuery),
             note: lp.note,
             added_at: lp.added_at,
             sort_order: lp.sort_order,
